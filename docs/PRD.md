@@ -572,44 +572,53 @@ requirement**, not documentation polish.
 
 ## 9. Open Questions / Decisions Needed
 
-These are genuine taste/architecture calls deliberately left open in this first draft.
+### 9a. Resolved Decisions (2026-05-31)
 
-1. **Offline kiosk resilience / caching.** How does ExhibitOS cache Directus content so
-   displays survive a Directus outage or LAN blip? Options: (a) ExhibitOS server-side
-   sync into the local SQLite cache + media mirror, with displays always hitting
-   ExhibitOS (never Directus directly) — recommended; (b) per-device service-worker
-   cache; (c) hybrid. Decision needed on cache invalidation strategy (webhook from
-   Directus on publish vs. periodic poll) and acceptable staleness window.
+1. **Printable-card export pipeline → Playwright (headless Chromium). RESOLVED.**
+   The card renders on-screen *and* prints, and both must match each other and InfoAge's
+   existing sign portfolio. Playwright drives the same Chromium that renders the on-screen
+   card, so one HTML/CSS template yields pixel-identical screen and print output.
+   WeasyPrint was rejected: its separate rendering engine drifts from the on-screen card
+   and would force two maintained looks. The only cost — bundling Chromium in the image —
+   is acceptable because export runs **server-side on the mini PC, never on kiosks**.
 
-2. **Printable-card export pipeline.** HTML → PDF via **Playwright** (headless Chromium —
-   matches kiosk rendering exactly, heavier dependency) vs. **WeasyPrint** (lighter,
-   pure-Python, but CSS-print fidelity differs from Chromium). Recommendation leans
-   Playwright for pixel-parity with the on-screen card, but it adds a browser dependency
-   to the mini-PC image. Decide based on how exactly print must match screen.
+2. **QR resolution → configurable base URL + per-exhibit path. RESOLVED.**
+   A single global setting `qr_base_url`; each Asset has a `slug`; the QR resolves to
+   `{qr_base_url}/{slug}`. Changing the base once repoints every QR. An optional
+   per-Asset **absolute-URL override** handles the exception case where one exhibit's deep
+   content lives elsewhere (e.g. a specific vcfed.org wiki page). This supersedes the
+   earlier open question on QR deep-content hosting — the *target* is configurable rather
+   than hard-bound to any one host.
 
-3. **Auth model between ExhibitOS and Directus.** A **static read-only Directus API
+3. **Offline resilience → two-tier cache. RESOLVED.**
+   (a) **Server-side mirror** on the mini PC: ExhibitOS holds the authoritative cached
+   copy of Directus content + media; displays always hit ExhibitOS, never Directus
+   directly. (b) **Kiosk-local cache** on each Pi / repurposed legacy PC: every kiosk has
+   real local storage, so it keeps showing its last-known-good content through a network
+   or server outage and degrades gracefully instead of going blank. Cache-invalidation
+   mechanism (Directus publish webhook vs. poll) and staleness window still to be set in
+   the architecture stage.
+
+4. **Multi-museum tenancy → one deployment per museum (Option A). RESOLVED.**
+   Each museum runs its own ExhibitOS + Directus stack on its own hardware; data is fully
+   isolated per museum. "Generic platform" means *the same open-source code anyone can
+   deploy*, not one shared instance hosting many museums. **Consequence: the schema stays
+   single-museum — no `museum` scoping field is added to collections.** This removes
+   tenancy complexity from the build entirely.
+
+### 9b. Still Open
+
+5. **Auth model between ExhibitOS and Directus.** A **static read-only Directus API
    token** scoped to published content (simple, recommended for v1) vs. a service account
    with a rotating token vs. Directus's role-based API keys. Also: should the ExhibitOS
    dashboard's admin auth and Directus's user accounts be unified (SSO) or kept separate
    (two logins)? Separate is simpler for v1; unified is nicer for volunteers long-term.
 
-4. **Where does device registration canonically live?** §5.5 mirrors devices into
+6. **Where does device registration canonically live?** §5.5 mirrors devices into
    Directus for authoring convenience, but live fleet state lives in ExhibitOS SQLite.
    Decide whether `display_device` exists in Directus at all, or whether the dashboard is
    the sole SoR for devices and authors assign content to *rooms* rather than to specific
    devices. Leaning: devices live only in ExhibitOS; authors assign to rooms.
-
-5. **QR deep-content hosting.** Where does `qr_target_url` resolve? Options: (a) the
-   museum's existing **vcfed.org wiki** entry (durable, externally owned, matches the
-   canonical sign's intent) + embedded YouTube; (b) an ExhibitOS-hosted public page
-   generated from the same Asset (single source of truth, but ExhibitOS must expose a
-   public web surface); (c) the project wiki. Recommendation: (a) for VCF content
-   authenticity, with (b) as a generic fallback for museums without their own wiki.
-
-6. **Multi-museum tenancy shape (Phase 3, flagged early).** One Directus instance per
-   museum vs. one instance with a `museum` scoping field across collections. Affects the
-   §5 model if we want to avoid a painful migration later — worth a deliberate decision
-   before Phase 2 hardens the schema.
 
 7. **Directus revenue-tier compliance.** The free self-hosted tier is conditioned on the
    deploying org being under $5M revenue. Confirm InfoAge / VCF qualifies, and document
@@ -627,3 +636,4 @@ These are genuine taste/architecture calls deliberately left open in this first 
 | Version | Date | Author | Changes |
 |---|---|---|---|
 | 0.1 | 2026-05-31 | Nick DeMarco (AI-assisted) | Initial first draft. Locked decisions documented (Directus as SoR, ExhibitOS as renderer+fleet, four v1 forms, 3280 first exhibit). |
+| 0.2 | 2026-05-31 | Nick DeMarco (AI-assisted) | Resolved 4 open questions (§9a): Playwright card export; configurable `qr_base_url` + per-exhibit slug; two-tier cache (server mirror + kiosk-local); one-deployment-per-museum tenancy (schema stays single-museum). |
