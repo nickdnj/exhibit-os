@@ -1,0 +1,44 @@
+version: "3.8"
+
+services:
+  signboard:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: signboard
+    restart: unless-stopped
+    ports:
+      - "8100:8100"
+    volumes:
+      - signboard_data:/data
+    environment:
+      - DATABASE_URL=sqlite:////data/signboard.db
+      - UPLOADS_DIR=/data/uploads
+      - JWT_SECRET_KEY=${JWT_SECRET_KEY}
+      - DEFAULT_ADMIN_PASSWORD=${DEFAULT_ADMIN_PASSWORD:-signboard2026}
+      - TEMPEST_API_TOKEN=${TEMPEST_API_TOKEN}
+      - TEMPEST_STATION_ID=${TEMPEST_STATION_ID:-183092}
+      - NOAA_STATION_ID=${NOAA_STATION_ID:-8531680}
+      - TAGSMART_API_URL=${TAGSMART_API_URL:-http://host.docker.internal:8080}
+      - TAGSMART_API_KEY=${TAGSMART_API_KEY:-}
+      - TIMEZONE=${TIMEZONE:-America/New_York}
+      - LOG_FORMAT=${LOG_FORMAT:-json}
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
+      - CORS_ORIGIN=${CORS_ORIGIN:-http://192.168.12.136:8100}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    networks:
+      - signboard-net
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+          cpus: "1.0"
+
+volumes:
+  signboard_data:
+    driver: local
+
+networks:
+  signboard-net:
+    driver: bridge

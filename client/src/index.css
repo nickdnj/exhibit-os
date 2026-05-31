@@ -1,0 +1,30 @@
+@import "tailwindcss";
+
+/* SignBoard Design Tokens */
+:root {
+  /* Brand / Nautical */
+  --brand-navy: #0B1F3A;
+  --brand-navy-mid: #132B50;
+  --brand-gold: #E5B83C;
+  --brand-gold-light: #FFD666;
+  --brand-white: #F8F9FA;
+
+  /* Status */
+  --status-green: #22C55E;
+  --status-green-bg: #14532D;
+  --status-yellow: #EAB308;
+  --status-red: #EF4444;
+  --status-red-bg: #7F1D1D;
+}
+
+body {
+  margin: 0;
+  font-family: 'Inter', system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+#root {
+  width: 100%;
+  height: 100vh;
+}
