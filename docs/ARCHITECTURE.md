@@ -245,7 +245,7 @@ auto-creates.
 | `closer` | text | closer / easter-egg strip line |
 | `qr_target_url` | string | **optional absolute-URL override**; when empty, QR uses `{qr_base_url}/{slug}` |
 | `deep_content_url` | string | canonical deep page (wiki entry) |
-| `youtube_url` | string | embedded video for deep content + video display |
+| `youtube_url` | string | YouTube link for the **phone/QR deep-content page only** — NOT played on kiosks (kiosk video is self-hosted; see §7.2 / 2026-06-01 policy) |
 | `card_template` | string (dropdown) | `infoage-house` (default) / future styles — **style, not form** |
 | `featured` | boolean | dashboard sorting |
 | `sort` | integer | manual ordering within a room |
@@ -557,9 +557,13 @@ at `GET /display/<room-slug>` with the form selected per §3.3.
 
 ### 7.2 Form 2 — Video Information Display
 
-- Renders on `passive` + `video`. Plays `asset.youtube_url` or `media[]` of type
-  `video`/`external_video`, looped, **muted autoplay** (museum-appropriate), optional
-  ambient audio per assignment.
+- Renders on `passive` + `video`. Plays **self-hosted video** — a `media[]` item of type
+  `video` served from the local mirror — via an **HTML5 `<video>` element** (looped,
+  **muted autoplay**, museum-appropriate, optional ambient audio per assignment).
+  **No YouTube/Vimeo iframe on any kiosk** (2026-06-01 policy): a YouTube embed on a public
+  kiosk exposes the "Watch on YouTube" link + suggested-video end cards, letting a visitor
+  escape into youtube.com. `asset.youtube_url` is phone/QR-side only. Browser-level
+  navigation lockdown is the backstop (§9 / issue #37).
 - **Room feed:** if a room (not a single asset) is assigned, cycles videos across the
   room's published assets in `asset.sort` order. Generalizes SignBoard's `PageCarousel`.
 - Honors `room.operating_hours` for scheduled screen on/off (Pi via agent/HDMI-CEC; Fully
@@ -779,6 +783,7 @@ via the 10-minute manual setup (`signboard-onn-fhd-kiosk-setup.md`, renamed).
 | **Fleet — Pi WS** | `DEVICE_AGENT_TOKEN` bearer on WS handshake; `update-scripts` restricted to a pinned repo/branch (no arbitrary command exec). |
 | **Fleet — Fully Kiosk REST** | Per-device password (masked in ExhibitOS settings); LAN-only :2323; never proxied publicly. |
 | **Display routes** | Unauthenticated read (kiosks need no login) but serve **published** content only (mirror is published-filtered). |
+| **Kiosk navigation** | Locked to the ExhibitOS origin via Fully Kiosk URL allowlist + Chromium `URLAllowlist`/`URLBlocklist` policy; context menus disabled; no clickable off-origin links; kiosk video is self-hosted HTML5 (no YouTube iframe). Prevents visitors escaping into the open web (issue #37). |
 | **Secrets** | Directus token, webhook secret, Fully Kiosk passwords, JWT key in env/`.env` + masked settings; per `credentials-apple-passwords` feedback, avoid plaintext credential files where a manager exists. |
 
 ### 11.3 Performance on cheap hardware
@@ -820,7 +825,7 @@ via the 10-minute manual setup (`signboard-onn-fhd-kiosk-setup.md`, renamed).
 | R8 | **Self-referential `related_assets` rendering loops** (3280→Onyx→3280) on touch interactive | Low | Low | Render "see also" as explicit navigation (not auto-expand); depth-1 traversal per tap; no recursive embed. |
 | R9 | **Service Worker stale-bundle on iOS-style caches** (cf. feedback `ios-pwa-double-relaunch`) | Low | Low | `vite-plugin-pwa` autoUpdate + a visible app version; document the "two force-closes / reload" recovery in the runbook; Fleet "Reload" handles it remotely. |
 | R10 | **Volunteer can't self-serve** (fails PRD §8 headline test) | Med | High | The whole D2/D4 design (assign-to-rooms, two clean surfaces) plus the required volunteer runbook (PRD §8.2); validate with a real InfoAge volunteer before "done." |
-| R11 | **Media mirror disk growth** on the mini PC (videos) | Low | Med | Prefer `external_video` (YouTube) for large video so binaries stay off the mirror; mirror only what's referenced by published assets; prune orphans on resync. |
+| R11 | **Media mirror disk growth** on the mini PC (self-hosted videos) | Med | Med | Kiosk video is self-hosted (no YouTube on kiosks, 2026-06-01 policy), so video binaries live on the mirror: stream downloads to disk (no in-memory buffering), serve with HTTP range, mirror only what's referenced by published assets, prune orphans aggressively on resync, and monitor disk. |
 
 ---
 
@@ -855,9 +860,10 @@ via the 10-minute manual setup (`signboard-onn-fhd-kiosk-setup.md`, renamed).
    dashboard. Simpler for v1; SSO is a documented Phase-2 improvement. Confirm OK.
 4. **Mini PC memory headroom (R2).** Three services + bundled Chromium want ~4 GB
    allocated. Confirm the target mini PC has the RAM (8 GB+ recommended).
-5. **Large video hosting (R11).** Recommend YouTube/`external_video` for anything big so
-   the media mirror stays lean. Confirm museum is fine embedding YouTube on the video
-   display (it already is for the QR deep page).
+5. **Kiosk video = self-hosted HTML5 (RESOLVED 2026-06-01).** Kiosks never embed YouTube
+   (escape risk on public/touch screens); they play self-hosted `<video>` from the mirror.
+   YouTube is reserved for the phone/QR deep-content page. Media mirror now holds video
+   binaries (R11), and a browser-level URL-allowlist lockdown (issue #37) is the backstop.
 
 ---
 

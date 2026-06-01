@@ -289,7 +289,7 @@ A physical display piece; the central record. Owns content reusable across all f
 | `closer` | text | the closer / easter-egg strip line |
 | `qr_target_url` | string (URL) | where the QR resolves (deep content) |
 | `deep_content_url` | string (URL) | wiki entry / canonical deep page |
-| `youtube_url` | string (URL) | embedded video for deep content + video display |
+| `youtube_url` | string (URL) | YouTube for the phone/QR **deep-content page only** — NOT played on kiosks (on-floor video is self-hosted HTML5; 2026-06-01 policy) |
 | `card_template` | string (enum: `infoage-house` / others) | which printable style to match |
 | `featured` | boolean | for dashboard sorting |
 
@@ -637,3 +637,4 @@ requirement**, not documentation polish.
 |---|---|---|---|
 | 0.1 | 2026-05-31 | Nick DeMarco (AI-assisted) | Initial first draft. Locked decisions documented (Directus as SoR, ExhibitOS as renderer+fleet, four v1 forms, 3280 first exhibit). |
 | 0.2 | 2026-05-31 | Nick DeMarco (AI-assisted) | Resolved 4 open questions (§9a): Playwright card export; configurable `qr_base_url` + per-exhibit slug; two-tier cache (server mirror + kiosk-local); one-deployment-per-museum tenancy (schema stays single-museum). |
+| 0.3 | 2026-06-01 | Nick DeMarco (AI-assisted) | Kept original link-target wiki architecture (no publish-to-wiki, no public-deep-page render target). **Kiosk video policy:** kiosks play self-hosted HTML5 `<video>` only — no YouTube iframe on kiosks (public-kiosk escape risk); YouTube reserved for phone/QR deep page. Added kiosk URL-allowlist navigation lockdown (issue #37). Media mirror now holds video binaries. |

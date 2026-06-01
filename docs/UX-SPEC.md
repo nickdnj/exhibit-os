@@ -105,7 +105,7 @@ This group contains every field rendered on the interpretive card. Label the gro
 |---|---|---|---|---|
 | `qr_target_url` | QR destination URL | URL input | No | "Leave blank to use the default (base URL + slug). Override only if the deep content page has a specific permanent URL." |
 | `deep_content_url` | Deep content page | URL input | No | "The wiki or web page this exhibit's full story lives on (linked from QR and touchscreen)." |
-| `youtube_url` | YouTube video URL | URL input | No | "Full YouTube URL for the video display form. Also embedded on the deep content page." |
+| `youtube_url` | YouTube video URL | URL input | No | "Full YouTube URL — embedded on the **phone/QR deep-content page only**. On-floor video screens play the self-hosted video file you upload as a Video media item, not YouTube." |
 
 ---
 
@@ -428,7 +428,7 @@ If a display has no assignment, or the assigned asset is in Draft status: same e
 
 ### 5.1 Purpose and Context
 
-A passive screen in the exhibit room plays embedded video full-screen, looped, muted by default. It runs on a `passive` device with `default_form = video`. The primary source is the Asset's `youtube_url`; if a room is assigned instead of a single asset, it cycles across all published assets' video URLs in order.
+A passive screen in the exhibit room plays **self-hosted video** full-screen, looped, muted by default, via an HTML5 `<video>` element. It runs on a `passive` device with `default_form = video`. The source is the Asset's self-hosted `video` media item (served from the local mirror); if a room is assigned instead of a single asset, it cycles across all published assets' self-hosted videos in order. **No YouTube/Vimeo iframe runs on a kiosk** (2026-06-01 policy — public-kiosk escape risk); `youtube_url` drives only the phone/QR deep-content page. Browser-level nav lockdown: issue #37.
 
 ### 5.2 Layout: Attract / Idle State
 
@@ -464,7 +464,7 @@ A semi-transparent dark strip (48px tall, rgba(0,0,0,0.55)) at the bottom of the
 This strip is subtle enough that visitors focused on the video will not find it distracting, but a curator doing a walkthrough can confirm which exhibit is playing.
 
 **Captions:**
-If the YouTube video has captions enabled at the source, they render within the video player natively. ExhibitOS does not add a separate caption layer. Caption font size is the video platform's default — the author is responsible for enabling accurate captions on the YouTube video.
+Since kiosk video is self-hosted HTML5 `<video>`, captions come from an optional sidecar WebVTT `<track>` file attached to the asset (or are burned into the video at production time). There is no reliance on a video platform's native caption UI. If no caption track is provided, the video plays without captions.
 
 ### 5.4 Looping Behavior
 
@@ -931,7 +931,7 @@ The kiosk displays are not operated via screen reader in typical museum use; how
 |---|---|---|
 | Interpretive card | Pi + HDMI monitor (1080p) | DisplayCanvas 1920x1080, CSS-scaled |
 | Interpretive card | Onn FHD stick (1080p TV) | Same DisplayCanvas |
-| Video display | Pi or Onn | Full-screen `<video>` or YouTube iframe |
+| Video display | Pi or Onn | Full-screen self-hosted HTML5 `<video>` (no YouTube iframe on kiosks) |
 | Touchscreen interactive | Pi + touchscreen (1080p or 1280x800) | DisplayCanvas with touch events |
 | Dashboard | Museum workstation (desktop) | Standard responsive layout, ≥1024px |
 | Dashboard | Museum tablet (iPad/Android) | Sidebar collapses to icon-only at <1024px |
@@ -950,7 +950,7 @@ The PRD §8 and §9a hard requirement: no demo data, no placeholder content on a
 | Asset is Draft (not Published) | "No exhibit assigned." (same message; do not expose draft status to a museum visitor) |
 | Directus unreachable, cache fresh | Last-known-good content + subtle cache-date indicator in the closer strip |
 | Directus unreachable, no cache | Error screen with reconnect message. Dark navy, no content |
-| Video URL 404 or embed refused | No-content state for video display. Do not autoplay an error page |
+| Self-hosted video missing/404 in mirror | No-content state for video display. Do not autoplay an error page |
 | Related exhibit deleted | Related exhibit button does not render. No broken link |
 | Gallery image fails to load | Image area shows museum's fallback image (a simple camera icon on off-white). Caption and credit still render |
 | Playwright PDF export fails | Dashboard shows error toast; PDF download does not initiate; curator prompted to retry |
