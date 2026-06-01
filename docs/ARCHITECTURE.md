@@ -1,10 +1,10 @@
 # Technical Architecture: ExhibitOS
 
-**Version:** 0.1
-**Last Updated:** 2026-05-31
+**Version:** 0.2
+**Last Updated:** 2026-06-01
 **Author:** Software Architecture (AI-assisted), for Nick DeMarco
 **Status:** Draft — for review
-**PRD Reference:** [`docs/PRD.md`](./PRD.md) v0.2
+**PRD Reference:** [`docs/PRD.md`](./PRD.md) v0.3
 **Repo:** `github.com/nickdnj/exhibit-os` · local `~/Workspaces/exhibit-os`
 
 ---
@@ -119,6 +119,7 @@ cached pull (with a publish webhook to make it near-real-time).**
 | D9 | Fleet protocol | **Two protocols, bridged not unified** (Pi=WS push, FullyKiosk=REST pull) | PRD-locked; inherited from SignBoard fleet specs verbatim. |
 | D10 | Tenancy | **One deployment per museum; no museum-scoping field** | PRD-locked. |
 | D11 | Tier-2 kiosk cache | **Service Worker (Pi/legacy PC) + Chromium HTTP cache** | Real local storage on each kiosk; survives server/network outage. (§5.3) |
+| D12 | **Display Profile** (per physical display) | **Profile in the ExhibitOS `display_device` registry** drives a render path = `{transport} × {orientation layout} × {text-scale from physical size + distance} × {class-allowed forms}`. Auto-detected screen metrics + manual physical size. | New 2026-06-01 decision. One profile per screen so identical content renders correctly on a 24″ desk monitor, a portrait wall sign, and a 75″ 4K TV without per-device code. (§6a) |
 
 ### 2.1 Technology stack
 
@@ -440,18 +441,22 @@ through a *network or server* outage:
 ## 6. Fleet / Device Protocol
 
 ExhibitOS inherits SignBoard's **two-protocol, bridged-not-unified** fleet model verbatim
-(`signboard-fleet-management-spec.md`, `signboard-google-tv-spec.md`). The only domain
-change is renaming and the addition of `device_class`.
+(`signboard-fleet-management-spec.md`, `signboard-google-tv-spec.md`). The domain changes
+are: renaming, the addition of `device_class`, and the per-display **Display Profile**
+(§6a) — which the agent/served-page report on connect (§6a.4). Note `platform` values are
+`chromium-kiosk` / `fully-kiosk` (§6.2 rename note); they select transport only.
 
 ### 6.1 Device classes
 
-| `device_class` | Renders | Hardware | Protocol |
+| `device_class` | Renders | Hardware | Platform / transport |
 |---|---|---|---|
-| `passive` | `card` or `video` | Pi Zero 2 W + monitor; legacy PC + monitor; Onn stick + TV; Google TV | Pi/legacy = WS; stick/TV = Fully Kiosk REST |
-| `touchscreen` | `interactive` (also can do card/video) | touch panel driven by a Pi/legacy PC (Chromium touch) | WS (touch needs the agent + local browser) |
+| `passive` | `card` or `video` | Pi Zero 2 W + monitor; legacy PC + monitor; Onn stick + TV; Google TV | `chromium-kiosk` (Pi/legacy = WS); `fully-kiosk` (stick/TV = REST) |
+| `touchscreen` | `interactive` (also can do card/video) | touch panel driven by a Pi/legacy PC (Chromium touch) | `chromium-kiosk` (touch needs the agent + local browser) |
 
-`device_class` gates the interactive form (D5/§3.3). `platform` (`pi` / `fully-kiosk` /
-`legacy-pc`) selects the fleet protocol.
+`device_class` gates the interactive form (D5/§3.3). `platform` (`chromium-kiosk` /
+`fully-kiosk`) selects the fleet transport + provisioning only — never the renderer. The
+full per-display **Display Profile** (resolution, orientation, DPR, physical size, viewing
+distance, class) and its render-path logic are specified in **§6a**.
 
 ### 6.2 `display_device` table (ExhibitOS SQLite — renamed/extended SignBoard `kiosks`)
 
@@ -460,18 +465,33 @@ change is renaming and the addition of `device_class`.
 | `id` | TEXT PK | hostname, e.g. `exhibit-main-gallery-card` |
 | `room_slug` | TEXT | the room feed it subscribes to (replaces `channel_slug`) |
 | `name` | TEXT | "Main Gallery — left wall" |
-| `device_class` | TEXT | `passive` / `touchscreen` |
-| `platform` | TEXT | `pi` / `fully-kiosk` / `legacy-pc` |
+| `device_class` | TEXT | `passive` / `touchscreen` — **profile field**, gates allowed forms (§3.3) |
+| `platform` | TEXT | `chromium-kiosk` / `fully-kiosk` — **profile field**, selects fleet transport + provisioning only (§6a.1) |
 | `default_form` | TEXT | `card` / `video` / `interactive` |
 | `assignment_form` | TEXT NULL | per-device form override (see §3.3) |
 | `fully_kiosk_ip` | TEXT NULL | for `fully-kiosk` platform |
+| **`resolution_w`** | **INTEGER NULL** | **profile — screen width in CSS px; auto-detected (§6a.4)** |
+| **`resolution_h`** | **INTEGER NULL** | **profile — screen height in CSS px; auto-detected** |
+| **`orientation`** | **TEXT NULL** | **profile — `landscape` / `portrait`; auto-detected (derived from w/h), manually overridable** |
+| **`device_pixel_ratio`** | **REAL NULL** | **profile — `window.devicePixelRatio`; auto-detected** |
+| **`physical_size_in`** | **REAL NULL** | **profile — diagonal in inches; MANUAL (browser can't know it)** |
+| **`viewing_distance_ft`** | **REAL NULL** | **profile — typical viewer distance in feet; MANUAL** |
+| **`profile_detected_at`** | **INTEGER NULL** | **epoch secs of last auto-detect handshake** |
 | `ip` | TEXT | last seen |
 | `version` | TEXT | git short-SHA reported by agent |
 | `online` | INTEGER | 0/1, computed from heartbeat/poll |
 | `last_heartbeat` | INTEGER | epoch seconds |
 | `uptime_seconds` / `memory_free_mb` / `load_avg_1m` | — | reported by Pi agent |
+| `off_channel` | INTEGER | 0/1, Fully Kiosk URL drift flag (§6.4) |
 | `status` | TEXT | `active` / `maintenance` / `retired` |
 | `created_at` | INTEGER | |
+
+> **`platform` value rename (2026-06-01).** The two platforms are now named for what
+> they actually are: **`chromium-kiosk`** (Pi / legacy PC running Chromium + `exhibit-agent`
+> over WebSocket) and **`fully-kiosk`** (Onn stick / Google TV running Fully Kiosk over
+> REST). `legacy-pc` is folded into `chromium-kiosk` (it is a Chromium kiosk on x86 — same
+> transport, same agent). Platform selects **only** the fleet transport and provisioning
+> path; it never changes the rendering engine, which is "everything is a web view."
 
 ### 6.3 Pi / legacy PC → WebSocket push (`exhibit-agent`)
 
@@ -521,11 +541,214 @@ writes the `display_assignment` row (§9.1), then:
 
 ---
 
+## 6a. Display Profile & Render Path (2026-06-01)
+
+> **Decision note (2026-06-01).** ExhibitOS gains a first-class **Display Profile** per
+> physical display, stored in the ExhibitOS `display_device` registry (D4/D12 — **never**
+> in Directus; a profile is fleet/hardware state, not content). The profile is the single
+> input that determines how one published Asset renders on any given screen, so identical
+> content is correct on a 24″ desk monitor, a portrait wall sign, and a 75″ 4K lobby TV
+> without per-device code. **Full portrait support ships in v1** (the interpretive card has
+> a distinct portrait composition, not a rotated landscape).
+
+### 6a.1 The Display Profile (fields)
+
+Per physical display, in `display_device` (§6.2):
+
+| Field | Type | Source | Meaning |
+|---|---|---|---|
+| `platform` | `chromium-kiosk` \| `fully-kiosk` | set at registration | fleet **transport + provisioning only** — not the renderer |
+| `device_class` | `passive` \| `touch` | set at registration | **hard gate** on allowed forms (§3.3); `touch` ⇒ may render `interactive` |
+| `resolution_w` × `resolution_h` | px | **auto-detected** | CSS-pixel screen size the browser reports |
+| `orientation` | `landscape` \| `portrait` | **auto-detected** (derived `w<h ⇒ portrait`), manual override allowed | selects the **card layout variant** |
+| `device_pixel_ratio` | float | **auto-detected** | `window.devicePixelRatio`; informs asset/QR raster sizing (4K = DPR 2 at 1080 CSS px) |
+| `physical_size_in` | inches (diagonal) | **MANUAL** (dashboard) | browser cannot know it; drives text scale |
+| `viewing_distance_ft` | feet | **MANUAL** (dashboard) | typical viewer standoff; drives text scale |
+
+### 6a.2 Render path — the decision logic
+
+The profile resolves to a render path with four orthogonal axes:
+
+```
+render_path(profile, assignment, asset) =
+  1. TRANSPORT       = profile.platform        # chromium-kiosk → WS push ; fully-kiosk → REST pull
+                                               #   (affects sync/refresh delivery ONLY, not the DOM)
+  2. FORM            = gate(device_class) → assignment.form → device.default_form → (card_template if card)
+                                               #   unchanged precedence from §3.3
+  3. LAYOUT VARIANT  = by FORM:
+       • card  → orientation == 'portrait' ? CARD_PORTRAIT : CARD_LANDSCAPE
+                 (fixed designed canvas, scaled-to-fit; letterbox/pillarbox OK — §7.1)
+       • video → RESPONSIVE  (object-fit: contain to actual viewport — §7.2, no fixed canvas)
+       • interactive → RESPONSIVE  (fluid grid to actual viewport — §7.3, no fixed canvas)
+  4. ROOT TEXT SCALE = text_scale(physical_size_in, viewing_distance_ft)   # §6a.3
+                       applied as the CSS root rem on EVERY form
+```
+
+- **Form precedence is unchanged** (§3.3): `device_class` hard gate → assignment form →
+  device `default_form` → `card_template` (style, when form=card). The profile adds the
+  **orientation** and **text-scale** axes; it does not re-open form precedence.
+- **Transport is decoupled from rendering.** A `chromium-kiosk` and a `fully-kiosk` showing
+  the same portrait card render byte-identical DOM; they differ only in how a content change
+  reaches them (WS `content_changed` push vs. the kiosk's own REST refetch).
+
+### 6a.3 Text legibility scales from physical size + viewing distance (not pixels)
+
+A pixel size that is legible on a 24″ monitor at a desk is **illegible** on a 75″ TV viewed
+from across a gallery, even though both are "1080p". Legibility is governed by the **visual
+angle** the text subtends at the viewer's eye, which depends on physical glyph height and
+viewing distance — not CSS pixels. ExhibitOS therefore computes a **root rem scale** from
+the profile and sets it as the CSS root font size; all type (which is authored in `rem`)
+scales coherently.
+
+**Baseline.** The existing ADA / distance-viewing minimums (UX-SPEC §8.1) are defined as
+correct on a **reference display: 24″ diagonal viewed at 5 ft**. We preserve those minimums
+exactly at the baseline and scale relative to it.
+
+**Formula.**
+
+```
+# Physical height of one CSS px on this screen (proportional to diagonal / hypot(resolution)).
+px_height_in(profile)  = profile.physical_size_in / hypot(resolution_w, resolution_h)
+
+# To hold the SAME visual angle as the baseline, on-screen physical glyph height must scale
+# with viewing distance. So the rem scale is:
+text_scale = (viewing_distance_ft / 5.0)              # farther viewer ⇒ bigger
+           × (px_height_in(reference) / px_height_in(profile))   # smaller/denser px ⇒ bigger rem
+where reference = 24" diagonal at 1920×1080  ⇒  px_height_in(reference) ≈ 0.01088 in/px
+
+root_rem_px = BASE_REM_PX (= 16) × clamp(text_scale, 0.85, 4.0)
+```
+
+Worked examples (BASE_REM_PX = 16, baseline 24″@5ft ⇒ scale 1.0 ⇒ 16px root):
+
+| Display | Diagonal | Resolution | Distance | `text_scale` | root rem |
+|---|---|---|---|---|---|
+| Reference desk monitor | 24″ | 1920×1080 | 5 ft | 1.00 | 16 px |
+| Wall card panel | 43″ | 1920×1080 | 8 ft | ~0.89 (closer in angular terms; clamped ≥0.85) | ~14 px |
+| Large lobby TV | 75″ | 3840×2160 (DPR 2) | 15 ft | ~1.71 | ~27 px |
+| Portrait corridor sign | 49″ (1080×1920) | portrait | 6 ft | ~1.06 | ~17 px |
+
+> 4K note: `device_pixel_ratio` is **not** in the text-scale math — text scale uses *physical*
+> px height (diagonal ÷ resolution hypotenuse), which already accounts for pixel density. DPR
+> is used separately to request appropriately-sized raster assets/QR so they stay crisp.
+
+- The card's fixed-canvas scale-to-fit (§7.1) and this root-rem scale **compose**: the canvas
+  is scaled geometrically to fit the viewport, and the canvas's *internal* type is authored in
+  rem so the legibility floor is honored regardless of canvas-to-viewport ratio. (Responsive
+  video/touch use the root rem directly.)
+- The clamp floor (0.85) prevents text shrinking below the ADA minimum on small/near displays;
+  the ceiling (4.0) prevents absurd sizes on misconfigured profiles. If `physical_size_in` /
+  `viewing_distance_ft` are unset, `text_scale = 1.0` (baseline) — never zero, never an error.
+
+### 6a.4 Profile auto-detect handshake (both transports)
+
+Screen metrics (`resolution`, `orientation`, `device_pixel_ratio`) are **auto-detected** by
+the browser and reported to ExhibitOS; physical size + viewing distance are **entered
+manually** in the dashboard (the browser cannot know them). The detected fields are stored
+**read-only** in the dashboard; the manual fields are editable (UX-SPEC §7.4a).
+
+**Common probe payload** (what the browser reports, both transports):
+
+```json
+POST /api/devices/{device_id}/profile        (or carried on the WS handshake — below)
+{
+  "type": "display_profile",
+  "resolution_w": 1920,
+  "resolution_h": 1080,
+  "orientation": "landscape",          // derived: innerWidth < innerHeight ? portrait : landscape
+  "device_pixel_ratio": 1.0,           // window.devicePixelRatio
+  "screen_w": 1920, "screen_h": 1080,  // window.screen.{width,height} (panel) for sanity vs innerWidth/Height
+  "agent_version": "1.0.4"             // present for chromium-kiosk only
+}
+```
+The server merges these into `display_device` (`resolution_w/h`, `orientation`,
+`device_pixel_ratio`, `profile_detected_at = now`) and **leaves `physical_size_in` /
+`viewing_distance_ft` untouched** (manual fields).
+
+**A) `chromium-kiosk` (Pi / legacy PC) — on the WS device-agent handshake.**
+The display page already knows its viewport; the simplest path is for the **served page** to
+read `window.innerWidth/innerHeight/devicePixelRatio/screen` and include them in the
+`exhibit-agent` connect frame (the agent runs alongside the local Chromium and can read them
+from a tiny bridge, or the page POSTs them directly on load — see (C)). Concretely, the agent
+adds the profile block to its first `WS /ws/device-agent` message:
+
+```json
+// first frame after connect, alongside the existing heartbeat identity
+{ "type": "register", "hostname": "exhibit-main-gallery-card",
+  "ip": "...", "version": "1.0.4",
+  "display_profile": { "resolution_w":1920, "resolution_h":1080,
+                       "orientation":"landscape", "device_pixel_ratio":1.0 } }
+```
+On reconnect or resolution change (`resize`/`orientationchange`), the agent re-sends an
+updated `display_profile` frame so a re-cabled or rotated panel self-heals.
+
+**B) `fully-kiosk` (Onn stick / Google TV) — no on-device agent.** Two complementary sources:
+- **Coarse, pull:** the dashboard's 30 s Fully Kiosk REST poll (`getDeviceInfo`) returns
+  `screenWidth`/`screenHeight`/`screenBrightness` etc.; the bridge maps `screenWidth/Height`
+  into `resolution_w/h` as a fallback. (Fully Kiosk reports the **panel**, which on a TV may
+  differ from the CSS viewport, so this is the fallback, not the primary.)
+- **Accurate, push (primary):** the **served display page itself** carries a tiny JS probe
+  (see (C)) that, on load and on `resize`/`orientationchange`, POSTs the common payload to
+  `POST /api/devices/{device_id}/profile`. The device id is resolved from the
+  `/display/<room-slug>?device_id=…` URL the dashboard assigns (or, if absent, the server
+  matches by source IP against the registered Fully Kiosk device). This gives ExhibitOS the
+  **true CSS viewport + DPR** of the Fully Kiosk webview without any on-device agent.
+
+**C) The served-page probe (shared by both transports).** `RoomDisplay` mounts a one-shot
+profile reporter that fires on first render and on `resize`/`orientationchange` (debounced):
+
+```ts
+function reportProfile(deviceId: string) {
+  const p = {
+    type: "display_profile",
+    resolution_w: window.innerWidth,
+    resolution_h: window.innerHeight,
+    orientation: window.innerWidth < window.innerHeight ? "portrait" : "landscape",
+    device_pixel_ratio: window.devicePixelRatio,
+    screen_w: window.screen.width, screen_h: window.screen.height,
+  };
+  navigator.sendBeacon(`/api/devices/${deviceId}/profile`, JSON.stringify(p));
+}
+```
+For `chromium-kiosk` this is redundant with the agent frame (either is sufficient; the page
+probe is the universal backstop). For `fully-kiosk` it is the **primary** accurate source.
+The probe is best-effort (`sendBeacon`) and never blocks rendering — a missing profile just
+means baseline text scale + landscape default until the first report lands.
+
+### 6a.5 Where the profile is consumed
+
+- **`GET /api/display/<room-slug>`** (§7 / issue #15) returns the device's profile fields and
+  the resolved `form`, `orientation`, and computed `text_scale` so the renderer needs no
+  second round trip. The endpoint resolves the device by `device_id` (query param the
+  dashboard bakes into each kiosk URL) or by source IP.
+- **`RoomDisplay` / `InfoAgeHouseCard`** (§7.1 / issue #22) pick the portrait vs. landscape
+  card canvas from `orientation` and set `:root { font-size: text_scale × 16px }`.
+- **Video / touch renderers** (§7.2/§7.3, issues #24/#25) ignore orientation for layout (they
+  are fluid) but still apply the root `text_scale` to any overlaid text (titles, captions,
+  buttons).
+
+---
+
 ## 7. Render Targets — one Asset, four forms
 
 All renderers read the **same cached Asset** from `content_cache` (Tier 1). No renderer
 stores content. Each form is a React route/component under `client/src/display/`, served
-at `GET /display/<room-slug>` with the form selected per §3.3.
+at `GET /display/<room-slug>` with the form selected per §3.3 and the **Display Profile**
+(§6a) selecting the orientation card layout and the root text scale.
+
+> **Profile-driven render model (2026-06-01).** Two distinct layout strategies, picked by
+> form (§6a.2):
+> - **Card = fixed designed canvas per orientation, scaled-to-fit.** Two designed canvases —
+>   landscape `1920×1080` and portrait `1080×1920` — each a deliberate composition. The
+>   active one is chosen by `profile.orientation` and CSS-transform scaled to the actual
+>   viewport (letterbox/pillarbox acceptable on odd aspect ratios). This extends the seeded
+>   `DisplayCanvas` (which already does `Math.min(w/W, h/H)` scale-to-fit) to accept a
+>   `portrait` design size.
+> - **Video and touch = responsive to the actual viewport (no fixed canvas).** Video uses
+>   `object-fit: contain`; touch is a fluid grid. They adapt to any resolution/orientation
+>   without bars.
+> - **All forms apply the profile's root `text_scale`** (§6a.3) as the CSS root rem so the
+>   ADA legibility floor holds across a 24″ desk monitor and a 75″ wall TV.
 
 ### 7.1 Form 1 — Interpretive Card + QR (on-screen AND printable)
 
@@ -546,20 +769,33 @@ at `GET /display/<room-slug>` with the form selected per §3.3.
 | Photo-slot list (production aid) | `media[]` with caption/source/credit |
 
 - **On-screen:** the `/display/<room>` route renders this template full-screen for a
-  `passive`+`card` device.
+  `passive`+`card` device, on the **orientation-matched designed canvas** (landscape
+  `1920×1080` or portrait `1080×1920`, §6a.2) scaled-to-fit the actual screen. The portrait
+  canvas is a **distinct composition** (title / hero+portrait stacked / bullets / backstory /
+  QR / closer reflowed tall — UX-SPEC §4.2a), not a rotated landscape. Type inside the canvas
+  is authored in `rem`; the root rem is set from `profile.text_scale` (§6a.3) so the ADA floor
+  holds at any physical size/distance.
 - **Print pipeline:** dashboard "Export printable card" → `POST /api/print/card/<asset_id>`
   → server runs **Playwright** headless Chromium, navigates to an internal render-only
-  route `/_print/card/<asset_id>?template=infoage-house` (same template, print CSS
-  `@page` sized to the InfoAge sign dimensions), `page.pdf()` → returns the PDF. **Runs
-  server-side on the mini PC only** (Chromium bundled in the ExhibitOS image; never on
-  kiosks). QR is rendered into the HTML via `qrcode` → data-URI so screen and print share
-  one QR.
+  route `/_print/card/<asset_id>?template=infoage-house&orientation=<landscape|portrait>`
+  (same template + orientation canvas, print CSS `@page` sized to the InfoAge sign
+  dimensions for that orientation), `page.pdf()` → returns the PDF. **Runs server-side on
+  the mini PC only** (Chromium bundled in the ExhibitOS image; never on kiosks). The print
+  `orientation` defaults to the assigned display's profile orientation but is selectable in
+  the export dialog (a curator may print a portrait sign for a screen that happens to be
+  landscape, or vice-versa). QR is rendered into the HTML via `qrcode` → data-URI so screen
+  and print share one QR.
 
 ### 7.2 Form 2 — Video Information Display
 
-- Renders on `passive` + `video`. Plays **self-hosted video** — a `media[]` item of type
-  `video` served from the local mirror — via an **HTML5 `<video>` element** (looped,
-  **muted autoplay**, museum-appropriate, optional ambient audio per assignment).
+- Renders on `passive` + `video`. **Responsive to the actual viewport — no fixed canvas**
+  (§6a.2): the `<video>` uses `object-fit: contain` and fills whatever resolution/orientation
+  the screen reports, with the player's natural letterbox/pillarbox on aspect mismatch; it
+  adapts to portrait or 4K with no app-drawn bars. Any overlaid text (title/room strip,
+  captions) is sized by the profile root `text_scale` (§6a.3). Plays **self-hosted video** —
+  a `media[]` item of type `video` served from the local mirror — via an **HTML5 `<video>`
+  element** (looped, **muted autoplay**, museum-appropriate, optional ambient audio per
+  assignment).
   **No YouTube/Vimeo iframe on any kiosk** (2026-06-01 policy): a YouTube embed on a public
   kiosk exposes the "Watch on YouTube" link + suggested-video end cards, letting a visitor
   escape into youtube.com. `asset.youtube_url` is phone/QR-side only. Browser-level
@@ -571,9 +807,13 @@ at `GET /display/<room-slug>` with the form selected per §3.3.
 
 ### 7.3 Form 3 — Touchscreen Interactive
 
-- Renders **only** on `device_class = touchscreen` (renderer-enforced gate, §3.3). A
+- Renders **only** on `device_class = touchscreen`/`touch` (renderer-enforced gate, §3.3). A
   passive device handed this form refuses it and falls back to `default_form` + logs an
   error state.
+- **Responsive to the actual viewport — no fixed canvas** (§6a.2): a fluid grid that reflows
+  for landscape, portrait, and 4K touch panels without bars; touch targets and type honor the
+  profile root `text_scale` (§6a.3) so the 64–88px target floor stays physically large enough
+  at the panel's size/distance.
 - Visitor can scroll `interpretive_body` + `backstory`, swipe the `media[]` gallery (each
   with caption/source/credit), open `person` bios, and tap a `related_assets` link to
   jump to the related asset's interactive view (**3280 → Onyx 10000 traversal** and back).
@@ -735,16 +975,18 @@ volumes: [directus_pgdata, directus_uploads, exhibitos_data]
 
 ### 10.2 Kiosks
 
-| Class | Device | OS/browser | Protocol | Tier-2 cache |
-|---|---|---|---|---|
-| passive card/video | Pi Zero 2 W + monitor (~$15) | Raspberry Pi OS + Chromium + `exhibit-agent` | WS | Service Worker + SD |
-| passive card/video | Onn FHD stick (~$20) + any TV | Fully Kiosk (Chromium) | REST :2323 | Fully Kiosk webview cache + SW |
-| passive (outdoor/polished) | Google TV | Fully Kiosk | REST :2323 | same |
-| touchscreen | Pi/legacy PC + touch panel | Chromium + `exhibit-agent` | WS | Service Worker + disk |
-| passive (repurposed) | legacy museum PC + monitor | Linux + Chromium + `exhibit-agent` (x86) | WS | Service Worker + disk |
+| Class | Device | Platform / transport | Typical profile (orientation · resolution · DPR · size@dist) | Form layout | Tier-2 cache |
+|---|---|---|---|---|---|
+| passive card/video | Pi Zero 2 W + monitor (~$15) | `chromium-kiosk` / WS | landscape · 1920×1080 · 1.0 · 43″@8ft | card: landscape canvas; video: responsive | Service Worker + SD |
+| passive card/video | Onn FHD stick (~$20) + any TV | `fully-kiosk` / REST :2323 | landscape · 1920×1080 · 1.0 · 55″@10ft | card: landscape canvas; video: responsive | Fully Kiosk webview cache + SW |
+| passive (large/lobby) | Google TV / 4K panel | `fully-kiosk` / REST :2323 | landscape · **3840×2160 · DPR 2** · 75″@15ft (high text_scale) | card: landscape canvas, scaled; video: responsive 4K | same |
+| passive (corridor sign) | **portrait-mounted** panel + Pi/stick | either | **portrait · 1080×1920** · 49″@6ft | **card: portrait canvas** (distinct comp.) | per platform |
+| touchscreen | Pi/legacy PC + touch panel | `chromium-kiosk` / WS | landscape **or portrait** · 1080p–1280×800 · varies | interactive: responsive fluid grid | Service Worker + disk |
+| passive (repurposed) | legacy museum PC + monitor | `chromium-kiosk` (x86) / WS | landscape · varies (odd aspect → pillarbox) | card: landscape canvas, letterboxed | Service Worker + disk |
 
-Each kiosk points at `http://<minipc>:8100/display/<room-slug>` (or via reverse proxy /
-Tailscale). Pi/legacy PC provisioned via refactored `scripts/kiosk/`; Fully Kiosk devices
+Each kiosk points at `http://<minipc>:8100/display/<room-slug>?device_id=<id>` (the dashboard
+bakes the `device_id` into the assigned URL so the served page can report its profile and the
+display API can resolve the device; or via reverse proxy / Tailscale). Pi/legacy PC provisioned via refactored `scripts/kiosk/`; Fully Kiosk devices
 via the 10-minute manual setup (`signboard-onn-fhd-kiosk-setup.md`, renamed).
 
 ### 10.3 Network assumptions
@@ -780,8 +1022,9 @@ via the 10-minute manual setup (`signboard-onn-fhd-kiosk-setup.md`, renamed).
 | **ExhibitOS↔Directus** | Static **read-only**, published-only token (D3); LAN/tailnet only. Leak = exposure of already-public content. |
 | **Directus admin/authoring** | Directus roles (Author/Reviewer/Admin); media-attribution enforced by Flow. On-LAN/tailnet. |
 | **ExhibitOS dashboard** | Existing JWT admin auth; on-LAN/tailnet; not publicly exposed in v1. |
-| **Fleet — Pi WS** | `DEVICE_AGENT_TOKEN` bearer on WS handshake; `update-scripts` restricted to a pinned repo/branch (no arbitrary command exec). |
-| **Fleet — Fully Kiosk REST** | Per-device password (masked in ExhibitOS settings); LAN-only :2323; never proxied publicly. |
+| **Fleet — `chromium-kiosk` WS** | `DEVICE_AGENT_TOKEN` bearer on WS handshake; `update-scripts` restricted to a pinned repo/branch (no arbitrary command exec). The `display_profile` carried on the handshake/`/api/devices/{id}/profile` is non-sensitive screen geometry. |
+| **Fleet — `fully-kiosk` REST** | Per-device password (masked in ExhibitOS settings); LAN-only :2323; never proxied publicly. The served-page profile probe (§6a.4) POSTs only screen geometry, LAN-side. |
+| **Display profile probe** | `POST /api/devices/{id}/profile` accepts only the geometry payload (resolution/orientation/DPR); device resolved by baked `device_id` or source IP; LAN/tailnet only; no auth required (same posture as unauthenticated display reads) but writes only non-sensitive profile fields and never the manual size/distance. |
 | **Display routes** | Unauthenticated read (kiosks need no login) but serve **published** content only (mirror is published-filtered). |
 | **Kiosk navigation** | Locked to the ExhibitOS origin via Fully Kiosk URL allowlist + Chromium `URLAllowlist`/`URLBlocklist` policy; context menus disabled; no clickable off-origin links; kiosk video is self-hosted HTML5 (no YouTube iframe). Prevents visitors escaping into the open web (issue #37). |
 | **Secrets** | Directus token, webhook secret, Fully Kiosk passwords, JWT key in env/`.env` + masked settings; per `credentials-apple-passwords` feedback, avoid plaintext credential files where a manager exists. |
@@ -836,7 +1079,9 @@ via the 10-minute manual setup (`signboard-onn-fhd-kiosk-setup.md`, renamed).
 2. **Stand up Directus** in Compose (§10.1) with the §4 content model + roles + Flows.
 3. **Sync service** (`directus_sync.py` + `directus_client.py`): webhook + poll + media
    mirror → `content_cache`.
-4. **Display API + RoomDisplay** routing; **Card renderer** (`InfoAgeHouseCard`).
+4. **Display API + RoomDisplay** routing; **Card renderer** (`InfoAgeHouseCard`) in **both
+   landscape and portrait** canvases; **Display Profile** auto-detect handshake + manual
+   size/distance, and the **text-scale system** (§6a) applied across all forms.
 5. **Playwright print** (`print_service.py`) — prove screen/print parity on the 3280 card.
 6. **Video + Touch interactive** renderers (touch gate).
 7. **Fleet**: rename agent → `exhibit-agent`, `/ws/device-agent`, Fully Kiosk bridge,
@@ -864,6 +1109,16 @@ via the 10-minute manual setup (`signboard-onn-fhd-kiosk-setup.md`, renamed).
    (escape risk on public/touch screens); they play self-hosted `<video>` from the mirror.
    YouTube is reserved for the phone/QR deep-content page. Media mirror now holds video
    binaries (R11), and a browser-level URL-allowlist lockdown (issue #37) is the backstop.
+6. **Full portrait support + Display Profile in v1 (DECIDED 2026-06-01).** The interpretive
+   card now ships **two designed canvases** (landscape + portrait); video/touch are responsive.
+   Each display carries a **Display Profile** (resolution/orientation/DPR auto-detected; physical
+   size + viewing distance entered manually) that drives orientation layout and a physical
+   text-scale (§6a). This **supersedes** the UX-SPEC §8.2 "portrait is Phase 2" note and the
+   earlier card decision "fixed 1920×1080 canvas." Two human inputs to relay: (a) confirm the
+   **portrait card composition** matches InfoAge house style on a real portrait sign at first
+   print proof; (b) confirm the **text-scale baseline** (24″@5ft) and the manual
+   `physical_size_in`/`viewing_distance_ft` capture step are acceptable in the volunteer/admin
+   workflow (admin sets size+distance once per display at provisioning).
 
 ---
 
@@ -872,3 +1127,4 @@ via the 10-minute manual setup (`signboard-onn-fhd-kiosk-setup.md`, renamed).
 | Version | Date | Author | Changes |
 |---|---|---|---|
 | 0.1 | 2026-05-31 | Software Architecture (AI-assisted) | Initial architecture. Resolved PRD §9b auth (static read-only token), device-location (ExhibitOS-only, assign-to-rooms), and form precedence (assignment>default, class-gated). Concrete Directus model, two-tier cache design, fleet protocol, render targets, SignBoard refactor map, deployment topology, NFRs, risks. |
+| 0.2 | 2026-06-01 | Software Architecture (AI-assisted) | **Display Profile & Render Path (new §6a, D12).** Added per-display profile (platform/class/resolution/orientation/DPR/physical-size/viewing-distance) to `display_device`; render path = transport × orientation layout × physical text-scale × class-allowed forms. Full **portrait support in v1** (distinct portrait card canvas; video/touch responsive). Physical-size+distance **text-scale** rule preserving ADA minimums. Auto-detect handshake for both transports (WS agent frame + served-page probe for Fully Kiosk). Renamed platforms to `chromium-kiosk`/`fully-kiosk`. Updated §6.1/§6.2/§7/§10.2/§11.2/§13/§14. |

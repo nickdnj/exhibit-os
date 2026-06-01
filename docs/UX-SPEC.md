@@ -1,10 +1,10 @@
 # UX Design Specification: ExhibitOS
 
-**Version:** 0.1
-**Date:** 2026-05-31
+**Version:** 0.2
+**Date:** 2026-06-01
 **Author:** Nick DeMarco, with AI assistance
 **Status:** Draft
-**PRD Reference:** `docs/PRD.md` (v0.2)
+**PRD Reference:** `docs/PRD.md` (v0.3)
 **Wiki Reference:** `wiki/projects/concurrent-3280-museum/museum-sign.md`
 
 ---
@@ -22,13 +22,16 @@ The visual language is deliberately neutral — warm off-white paper tones that 
 | Decision | Choice | Rationale |
 |---|---|---|
 | Directus authoring UX | Field grouping with contextual help text, not custom forms | Non-technical volunteers; Directus's native UI is already battle-tested for this. Custom forms would require maintenance. |
-| Card layout model | Fixed 1920x1080 canvas (reusing SignBoard's DisplayCanvas) | Consistent cross-device rendering at distance; matches SignBoard's proven pattern. |
+| Card layout model | **Two fixed designed canvases — landscape 1920×1080 and portrait 1080×1920 — scaled-to-fit** (DisplayCanvas extended with a `portrait` design size) | Consistent cross-device rendering at distance; full portrait support in v1 (ARCHITECTURE §6a, 2026-06-01). A portrait sign is a distinct composition, not a rotated landscape. |
+| Per-display Display Profile | **Profile = orientation + resolution + DPR (auto-detected) + physical size + viewing distance (manual) + class** | Drives orientation layout + physical text-scale so one Asset is legible on a 24″ desk monitor and a 75″ wall TV (ARCHITECTURE §6a). |
+| Video / touch layout model | **Responsive to the actual viewport (no fixed canvas)** | Video `object-fit: contain`; touch fluid grid. Adapt to any resolution/orientation/4K without bars (ARCHITECTURE §6a.2). |
+| Text legibility | **Scaled from physical size + viewing distance, not pixels** (root rem from profile) | Preserves ADA distance-viewing minimums across screen sizes (ARCHITECTURE §6a.3 / UX §8.1). |
 | Print and screen card | One HTML/CSS template, Playwright headless export | PRD §9a locked this. No drift between on-screen and print. |
 | Interpretive card structure | Mirrors InfoAge 9-sign portfolio exactly | Physical sign cohesion is a PRD AC. Deviation breaks the museum portfolio. |
 | Interactive idle reset | 90 seconds, returns to attract screen | Long enough for reading, short enough to reset for the next visitor. |
 | Dashboard device model | Rooms as the assignment target; devices are fleet-only | Aligns with PRD §9b lean: devices live in ExhibitOS SQLite; authors never see device hostnames. |
 | Empty/error state policy | Error message + last-cached content; never demo data | PRD §8 and §9a hard requirement. |
-| Typography for distance | Title 72px+, body 28-32px minimum on 1080p canvas | ADA museum standard; readable at 1.5m standing distance. |
+| Typography for distance | Title 72px+, body 28-32px minimum **at the baseline profile (24″ @ 5ft); scaled by the profile root rem on larger/farther screens** | ADA museum standard; readable at 1.5m standing distance and preserved on 75″ wall TVs via the text-scale rule (ARCHITECTURE §6a.3). |
 
 ### 1.3 Design Principles
 
@@ -245,6 +248,8 @@ Doug receives a notification. He makes edits, saves, sets back to In Review.
 
 Once Published, Doug opens the ExhibitOS dashboard (separate URL, separate login for v1). He navigates to Rooms > VCF Main Gallery. He sees the "Main Gallery — left wall" display. He clicks "Assign Content", selects "The Concurrent 3280" from the published assets list, chooses Form: Card. He saves. The display immediately shows the card (via WebSocket push or 60s poll). Done.
 
+> The display's **Display Profile** (resolution/orientation/DPR) is auto-detected the first time the screen connects, and its physical size + viewing distance were entered once by the admin at provisioning (§7.4a). Doug never touches the profile — the card automatically renders in the right orientation at the right text scale. If the display is a portrait sign, Doug's identical "assign card" action yields the portrait card composition (§4.2a) with no extra step.
+
 ---
 
 **Step 6: Export the printable card (in the ExhibitOS dashboard)**
@@ -324,6 +329,60 @@ The canvas follows the existing DisplayCanvas component (1920x1080, CSS-transfor
 **Column gutters:** 48px between left and right columns, 48px outer margin.
 **Vertical rhythm:** 24px between sections within a column.
 **Overflow handling:** If bullet list or body text overflows its zone, reduce font size to 24px as a first step, then 20px as a minimum floor. Never clip content. If content still overflows at 20px, truncate the interpretive body with an ellipsis and a "Full story: scan QR" note.
+
+> **Profile note.** This is the **landscape** canvas (`1920×1080`), selected when `profile.orientation = landscape`. Px sizes above are at the **baseline profile** (24″ @ 5 ft); the renderer sets the CSS root rem from the profile `text_scale` (ARCHITECTURE §6a.3) so the same canvas stays legible on a 75″ wall TV. The whole canvas is then CSS-transform scaled-to-fit the actual viewport (letterbox/pillarbox on odd aspect ratios), reusing the seeded `DisplayCanvas`.
+
+---
+
+### 4.2a Portrait Card Layout (1080x1920 canvas) — v1
+
+When `profile.orientation = portrait`, the card renders a **distinct portrait composition** on a `1080×1920` designed canvas (not a rotated landscape). It carries the same structural elements as the landscape card and the same InfoAge house style — title / hero+portrait / bullets / backstory / QR / closer — **reflowed top-to-bottom for a tall canvas** (single column, no left/right split). This mirrors the physical InfoAge house style adapted to a portrait sign.
+
+```
+┌────────────────────────────────────────────────┐ 1080 wide
+│  TITLE BAR — full width, InfoAge blue, 120px    │
+│  Title: white, 72px bold sans, left-pad 56px    │
+│  Subtitle: white, 32px light, below title       │
+├────────────────────────────────────────────────┤
+│  HERO PHOTO — full width, ~640px tall (fill)    │
+│  Caption: 22px serif italic, pad 32px           │
+│  Credit: 16px gray                              │
+├──────────────────────────┬─────────────────────┤
+│  INVENTOR PORTRAIT        │  (portrait sits      │
+│  320×320px, left          │   beside its meta,   │
+│  Name: 30px bold sans     │   one band, not a    │
+│  Credentials: 22px gray   │   full second column)│
+│  Role: 22px italic        │                     │
+│  Lifespan: 18px gray      │                     │
+├──────────────────────────┴─────────────────────┤
+│  AT A GLANCE  (label 16px uppercase, blue)      │
+│  • Bullet fact (32px semi-bold)                 │
+│  • Bullet fact                                  │
+│  • ... (6–10 bullets, full width)               │
+├────────────────────────────────────────────────┤
+│  INTERPRETIVE BODY                              │
+│  26px serif, line-height 1.6, full width        │
+│  (150–250 words)                                │
+├────────────────────────────────────────────────┤
+│  THE BACKSTORY:  (label 18px uppercase, blue)   │
+│  24px serif, line-height 1.6, full width        │
+├──────────────────────────┬─────────────────────┤
+│  QR CODE                  │  "Scan for the       │
+│  220×220px, left          │   full story…"       │
+│                           │  20px serif italic   │
+├──────────────────────────┴─────────────────────┤
+│  CLOSER STRIP — full width, dark navy, 110px    │
+│  Closer: white/gold, 28px italic serif, centered│
+└────────────────────────────────────────────────┘ 1920 tall
+```
+
+**Layout rules (portrait):**
+- **Single primary column** at full canvas width (56px outer margins). The two places that pair side-by-side (portrait+meta, QR+caption) are *bands* within the single column, not a true two-column split — this keeps the tall reading flow uninterrupted.
+- **Vertical order is the narrative order:** title → hero → inventor → bullets → body → backstory → QR → closer. (Landscape splits this into two columns; portrait stacks it.)
+- **Section rhythm:** 32px between stacked sections (vs. 24px landscape — more vertical room).
+- **Overflow handling:** same ladder as landscape — bullets/body reduce 32→28→24px (portrait floor 24px, larger than landscape's 20px because the wider single column needs fewer reflows), then ellipsis + "Full story: scan QR".
+- **Scale-to-fit + text-scale:** the `1080×1920` canvas is CSS-transform scaled to the actual portrait screen (pillarbox/letterbox on odd aspect ratios); type is authored in rem and the root rem comes from the profile `text_scale` (ARCHITECTURE §6a.3), preserving ADA minimums.
+- **Print:** the printable export uses this same portrait canvas when `orientation=portrait` is selected in the export dialog (ARCHITECTURE §7.1), so a portrait on-screen sign and its printed counterpart match.
 
 ---
 
@@ -790,6 +849,11 @@ Clicking "Manage" on a display opens a side panel (480px wide, slides in from ri
 │  [Reload content]   [Reboot device]                          │
 │  [Preview display]  (opens /display/<slug> in new tab)       │
 ├──────────────────────────────────────────────────────────────┤
+│  DISPLAY PROFILE   (auto-detected + manual — see §7.4a)      │
+│  Resolution 1920×1080 · Landscape · DPR 1.0   (read-only)    │
+│  Physical size [43] in · Viewing distance [8] ft  [Save]     │
+│  Text scale 0.89× · root rem ≈14px                           │
+├──────────────────────────────────────────────────────────────┤
 │  LIVE STATUS                                                 │
 │  Hostname: pi-gallery-01                                     │
 │  IP: 192.168.1.45   Uptime: 4d 2h   Mem free: 180 MB        │
@@ -805,6 +869,44 @@ Clicking "Manage" on a display opens a side panel (480px wide, slides in from ri
 3. On success, browser downloads the PDF. Button returns to normal.
 4. On error, button shows "Export failed — try again" in red text, stays active for retry.
 5. Typical generation time: 3–8 seconds.
+
+### 7.4a Display Profile setup (in the Display detail panel)
+
+The Display detail panel gains a **Display Profile** section, between Fleet Controls and Live Status. It shows the auto-detected screen metrics **read-only** and lets the admin enter the two fields the browser cannot know — physical size and viewing distance — once, at provisioning.
+
+```
+┌──────────────────────────────────────────────────────────────┐
+│  DISPLAY PROFILE                                            │
+│  ─────────────────────────────────────────────────────────  │
+│  Auto-detected  (reported by the display — read-only)        │
+│   Resolution:        1920 × 1080 px      [🔄 last seen 2m ago]│
+│   Orientation:       Landscape           (auto)              │
+│   Pixel ratio (DPR): 1.0                                     │
+│   Detected:          2026-06-01 14:22                        │
+│                                                              │
+│  Set by you  (the browser can't know these)                  │
+│   Physical size:     [  43  ] inches (diagonal)              │
+│   Viewing distance:  [   8  ] feet                           │
+│   ┌────────────────────────────────────────────────────┐    │
+│   │  Computed text scale: 0.89×  ·  root rem ≈ 14px      │    │
+│   │  "Type will be slightly smaller than the 24-inch     │    │
+│   │   desk-monitor baseline — still above the ADA floor."│    │
+│   └────────────────────────────────────────────────────┘    │
+│   [Save profile]                                             │
+│                                                              │
+│   Orientation override:  ( ) Auto  ( ) Force landscape       │
+│                          ( ) Force portrait                  │
+└──────────────────────────────────────────────────────────────┘
+```
+
+**Behavior:**
+- **Auto-detected fields are read-only.** `Resolution`, `Orientation`, and `Pixel ratio` are populated from the display's profile report (WS agent handshake for `chromium-kiosk`; served-page probe for `fully-kiosk` — ARCHITECTURE §6a.4). A small "last seen Nm ago" with a refresh affordance shows recency; a never-reported display shows "Awaiting first report from display" and the manual fields still work.
+- **Manual fields are editable** with sensible numeric inputs: `Physical size` (inches, diagonal) and `Viewing distance` (feet). Defaults are empty; while empty the system uses the baseline text-scale of 1.0 (never an error).
+- **Live computed preview.** As the admin types size/distance, the panel shows the resulting **text scale** and approximate root rem (the formula in ARCHITECTURE §6a.3) with a one-line plain-language interpretation. This makes the otherwise-invisible legibility math tangible — the admin can nudge "viewing distance" up and watch type grow.
+- **Orientation override.** Default `Auto` trusts the detected orientation. `Force landscape` / `Force portrait` covers a mis-reporting panel or a deliberate portrait sign on a hardware-landscape panel. The override writes `display_device.orientation` and the auto-detect stops overwriting it until set back to `Auto`.
+- **Save** posts the manual fields (and any override) to the device registry; the assigned display picks up the new text-scale/orientation on its next content refresh (WS push or REST refetch). No re-provisioning.
+
+This is an **admin/provisioning** step (Persona C, set once), not a routine curator task — it lives in the same panel but visually below the day-to-day content/print/fleet controls.
 
 ### 7.5 Assets Screen
 
@@ -898,7 +1000,7 @@ The settings screen contains the ExhibitOS-level configuration that the System A
 ### 8.1 Accessibility
 
 **Distance viewing (ADA museum standard):**
-The primary accessibility consideration for kiosk displays is legibility at 1.0–2.0m standing distance. The size standards below apply to the 1920x1080 canvas and scale proportionally with DisplayCanvas.
+The primary accessibility consideration for kiosk displays is legibility at 1.0–2.0m standing distance. The size standards below are the **baseline minimums at the reference profile (24″ diagonal viewed at 5 ft)**. They are authored in `rem` and the renderer sets the CSS root rem from the profile's physical-size + viewing-distance **text-scale** (ARCHITECTURE §6a.3), so these minimums are **preserved or enlarged** on bigger/farther screens (e.g. a 75″ wall TV) and never fall below the floor (text-scale is clamped ≥ 0.85). Px values below scale proportionally with DisplayCanvas.
 
 | Content type | Minimum size on canvas | Notes |
 |---|---|---|
@@ -927,18 +1029,24 @@ The kiosk displays are not operated via screen reader in typical museum use; how
 
 ### 8.2 Responsive Behavior by Device Class
 
-| Surface | Device | Behavior |
+Behavior is driven by the **Display Profile** (ARCHITECTURE §6a): card = fixed designed canvas per **orientation**, scaled-to-fit; video/touch = responsive to the actual viewport; all forms apply the profile root **text-scale**.
+
+| Surface | Device / profile | Behavior |
 |---|---|---|
-| Interpretive card | Pi + HDMI monitor (1080p) | DisplayCanvas 1920x1080, CSS-scaled |
-| Interpretive card | Onn FHD stick (1080p TV) | Same DisplayCanvas |
-| Video display | Pi or Onn | Full-screen self-hosted HTML5 `<video>` (no YouTube iframe on kiosks) |
-| Touchscreen interactive | Pi + touchscreen (1080p or 1280x800) | DisplayCanvas with touch events |
+| Interpretive card (landscape) | Pi/Onn + landscape 1080p monitor/TV | Landscape DisplayCanvas 1920×1080, CSS scale-to-fit; root rem from text-scale |
+| Interpretive card (portrait) | Portrait-mounted panel (1080×1920) | **Portrait DisplayCanvas 1080×1920** (distinct composition, §4.2a), CSS scale-to-fit |
+| Interpretive card (4K) | 3840×2160 panel, DPR 2 | Same landscape/portrait canvas, scaled up; **higher text-scale** keeps type legible at distance; QR/raster sized per DPR |
+| Interpretive card (odd aspect) | Non-16:9 / ultrawide / square | Canvas scaled-to-fit with **letterbox/pillarbox** (acceptable); content never clipped |
+| Video display | Pi or Onn, any orientation/resolution | **Responsive** full-screen self-hosted HTML5 `<video>`, `object-fit: contain` (no YouTube iframe on kiosks); no app-drawn bars |
+| Touchscreen interactive | Pi + touchscreen, landscape **or portrait**, 1080p / 1280×800 / 4K | **Responsive fluid grid** with touch events; reflows for orientation; targets/type honor text-scale |
 | Dashboard | Museum workstation (desktop) | Standard responsive layout, ≥1024px |
 | Dashboard | Museum tablet (iPad/Android) | Sidebar collapses to icon-only at <1024px |
 | Dashboard | Phone | Not a target; not optimized |
 | Directus authoring | Any browser | Directus's own responsive layout; no customization needed |
 
-**Portrait screens:** If a display is rotated portrait (some kiosk installations), the DisplayCanvas `DESIGN_W/DESIGN_H` should be invertible with a CSS class. This is not a v1 requirement but the DisplayCanvas should accept a `portrait` prop for Phase 2.
+**Portrait screens (v1, not Phase 2).** Portrait is **fully supported in v1**. `DisplayCanvas` accepts a design size (landscape `1920×1080` or portrait `1080×1920`); `RoomDisplay` picks it from `profile.orientation`. The portrait card is a distinct composition (§4.2a), not a CSS-rotated landscape. (This supersedes the earlier "Phase 2 portrait prop" note.)
+
+**Odd aspect ratios & 4K.** The card's scale-to-fit tolerates any aspect ratio via letter/pillarboxing — never clip. On 4K (DPR 2) the canvas scales up cleanly; the profile `device_pixel_ratio` is used to request crisp QR/raster assets, and the higher physical-size/distance typically raises the text-scale so type stays legible across the gallery.
 
 ### 8.3 Empty and Error States Policy
 
@@ -1009,7 +1117,7 @@ These are UX-layer items that need a decision or verification before implementat
 
 5. **Dashboard auth unification.** PRD §9b left this open. For v1, the spec assumes two separate logins (Directus and ExhibitOS dashboard). The "View in Directus" button in the Assets screen (§7.5) is the handoff link between the two. If a future unified SSO is implemented, the "View in Directus" deep link still works; only the login step changes.
 
-6. **Portrait-orientation card.** Some museums post signs in portrait orientation (tall, narrow). The current layout is landscape (1920x1080). A portrait variant (1080x1920 or a narrower A4-portrait format) would serve more installation contexts. Not a v1 requirement but worth designing a single flex-direction toggle into the card CSS from the start rather than retrofitting later.
+6. **Portrait-orientation card — RESOLVED (2026-06-01): in v1.** Portrait is fully supported in v1 via a distinct designed portrait canvas (§4.2a, ARCHITECTURE §6a), not a flex-direction toggle on the landscape layout. Open verification: confirm the portrait composition reads as InfoAge house style on a real portrait sign at the first print proof (folded into the print-proof issue). The portrait canvas dimensions (`1080×1920` on-screen; print canvas TBD with InfoAge per Q1) should be confirmed against any physical portrait sign InfoAge already has.
 
 7. **Volunteer runbook scope.** The spec describes the authoring UX. The runbook (a separate deliverable per PRD §8.2) should incorporate the exact step-by-step flows from §3.6 of this spec, formatted as a printable document. Confirm whether the runbook is within this UX spec's scope or is authored separately.
 
@@ -1020,3 +1128,4 @@ These are UX-layer items that need a decision or verification before implementat
 | Version | Date | Author | Changes |
 |---|---|---|---|
 | 0.1 | 2026-05-31 | Nick DeMarco (AI-assisted) | Initial draft. Covers Directus authoring UX, all three render targets, dashboard wireframes, accessibility, design language. |
+| 0.2 | 2026-06-01 | Nick DeMarco (AI-assisted) | **Display Profile.** Added portrait card wireframe (§4.2a, 1080×1920 distinct composition); portrait now v1, not Phase 2 (resolved §10 Q6). Rewrote responsive matrix (§8.2) for portrait + odd aspect + 4K. Added Display Profile setup flow to the Display detail panel (§7.4a — auto-detected read-only fields + manual physical size/distance + live text-scale preview + orientation override). Tied §8.1 ADA minimums to the profile text-scale. Updated key-decisions table and authoring happy path. Aligns with ARCHITECTURE §6a (2026-06-01). |
