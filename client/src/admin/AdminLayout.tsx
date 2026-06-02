@@ -10,6 +10,7 @@ const tabs = [
   { id: 'dashboard', label: 'Home', icon: '🏠' },
   { id: 'channels', label: 'Channels', icon: '📺' },
   { id: 'pages', label: 'Pages', icon: '📄' },
+  { id: 'exhibits', label: 'Exhibits', icon: '🏛️' },
   { id: 'settings', label: 'Settings', icon: '⚙️' },
 ];
 

@@ -14,6 +14,7 @@ from .api.auth import router as auth_router, hash_password
 from .api.health import router as health_router, update_service_status
 from .api.pages import router as pages_router
 from .api.channels import router as channels_router
+from .api.exhibits import router as exhibits_router
 from .api.settings import router as settings_router
 from .api.admin import router as admin_router, install_log_ring_buffer, mark_started
 from .services.settings_service import settings_service
@@ -139,6 +140,7 @@ app.include_router(auth_router)
 app.include_router(health_router)
 app.include_router(pages_router)
 app.include_router(channels_router)
+app.include_router(exhibits_router)
 app.include_router(settings_router)
 app.include_router(admin_router)
 app.include_router(ws_router)

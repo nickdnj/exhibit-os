@@ -3,6 +3,7 @@ import AdminLayout from './AdminLayout';
 import AdminDashboard from './AdminDashboard';
 import ChannelManager from './ChannelManager';
 import PageManager from './PageManager';
+import ExhibitManager from './ExhibitManager';
 import Settings from './Settings';
 
 export default function AdminApp() {
@@ -16,6 +17,8 @@ export default function AdminApp() {
         return <ChannelManager />;
       case 'pages':
         return <PageManager />;
+      case 'exhibits':
+        return <ExhibitManager />;
       case 'settings':
         return <Settings onNavigate={setActiveTab} />;
       default:

@@ -1,5 +1,6 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import ChannelDisplay from './display/ChannelDisplay';
+import ExhibitCard from './display/ExhibitCard';
 import Login from './admin/Login';
 import ChangePassword from './admin/ChangePassword';
 import AdminApp from './admin/AdminApp';
@@ -10,6 +11,9 @@ function App() {
       <Routes>
         {/* Display routes — used by Pi kiosk */}
         <Route path="/display/:slug" element={<ChannelDisplay />} />
+
+        {/* Public interpretive card — QR / phone deep-dive target */}
+        <Route path="/exhibit/:slug" element={<ExhibitCard />} />
 
         {/* Admin routes */}
         <Route path="/admin/login" element={<Login />} />

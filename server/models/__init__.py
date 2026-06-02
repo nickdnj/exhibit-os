@@ -6,3 +6,4 @@ from .announcement import Announcement
 from .setting import Setting
 from .admin_user import AdminUser
 from .audit_log import AuditLog
+from .exhibit import Exhibit
