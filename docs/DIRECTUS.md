@@ -77,6 +77,32 @@ Directus integration (authoring exhibits in the Data Studio → ExhibitOS render
 **next major build phase.** This document describes the destination, and the architecture for getting
 there is in [`ARCHITECTURE.md`](ARCHITECTURE.md).
 
+## Try it yourself (5 minutes, needs Docker)
+
+You can run a throwaway Directus on your own machine to see the Data Studio:
+
+```bash
+docker run -d --name directus-test -p 8055:8055 \
+  -v directus_test_db:/directus/database \
+  -e SECRET="local-test-secret-change-me" \
+  -e ADMIN_EMAIL="admin@example.com" \
+  -e ADMIN_PASSWORD="choose-a-password" \
+  -e DB_CLIENT="sqlite3" -e DB_FILENAME="/directus/database/data.db" \
+  directus/directus:latest
+```
+
+Then open **http://localhost:8055** and log in with that email/password.
+
+- ⚠️ Use a **real-looking email** (`admin@example.com`, not `admin@something.local`) — Directus
+  rejects invalid TLDs at startup and the container will exit.
+- Content persists in the `directus_test_db` Docker volume between runs.
+- Stop / start / remove it with `docker stop directus-test` / `docker start directus-test` /
+  `docker rm -f directus-test`.
+
+To get a feel for it: **Settings → Data Model → Create Collection** (e.g. "Exhibit"), add a few
+fields (Title, Status, Summary), then **Content → Exhibit → +** to author an entry. That's the exact
+flow a museum volunteer would use.
+
 ## Learn more
 
 - **Directus home & overview:** https://directus.io
