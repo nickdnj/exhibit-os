@@ -53,8 +53,11 @@ These shape the build and are the best places to collaborate.
   how much we automate and what the runbook must cover.
 
 ### 6. Directus licensing
-- Directus's self-hosted tier is free for organizations under $5M in revenue. We expect VCF (a
-  501(c)(3) nonprofit) qualifies easily — just need a quick confirmation to document it.
+- Directus (the content tool — see [`DIRECTUS.md`](DIRECTUS.md)) is free to self-host, in
+  production with no feature limits, for organizations with **under $5M in total annual income**
+  (revenue + budget + funding, whichever is largest) under its Monospace Sustainable Core License.
+  We expect VCF (a 501(c)(3) nonprofit) qualifies easily — just need a quick confirmation of the
+  figure to document it.
 
 ---
 

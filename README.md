@@ -47,8 +47,8 @@ with embedded video) so the story continues after they walk away.
 
 ## How it works
 
-Content lives in **Directus** — a free, self-hosted, open-source CMS with no feature
-paywall for a nonprofit. A volunteer authors an exhibit there once (with roles, drafts, and
+Content lives in **[Directus](docs/DIRECTUS.md)** — a free, self-hosted, open-source CMS with no
+feature paywall for a nonprofit ([what is Directus?](docs/DIRECTUS.md)). A volunteer authors an exhibit there once (with roles, drafts, and
 an approval step so the live signs can't break by accident). ExhibitOS reads that content
 and **renders it to every screen by device type**, caches it locally so a network blip
 never blanks the gallery, and controls the physical fleet from its dashboard. The whole
@@ -93,6 +93,7 @@ Start with the [docs index](docs/README.md), or jump straight in:
 |-----|----------------|
 | [docs/README.md](docs/README.md) | Documentation index / where to start |
 | [docs/VCF-PROPOSAL.md](docs/VCF-PROPOSAL.md) | **The pitch** — why ExhibitOS for the VCF Museum, and the proposed pilot |
+| [docs/DIRECTUS.md](docs/DIRECTUS.md) | **What Directus is** — plain-language primer on the free, self-hosted content tool ExhibitOS is built on |
 | [docs/PRD.md](docs/PRD.md) | Product requirements — vision, the four forms, personas, scope |
 | [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | Technical architecture — Directus as content SoR, renderers + fleet, Display Profile, caching |
 | [docs/UX-SPEC.md](docs/UX-SPEC.md) | UX specification — layouts, the InfoAge house card style, legibility |

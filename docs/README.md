@@ -9,7 +9,8 @@ ExhibitOS does but *why* every decision was made.
 **You're with VCF / a museum (Doug, Jeff, curators, managers):**
 1. [`VCF-PROPOSAL.md`](VCF-PROPOSAL.md) — the pitch: what ExhibitOS is and why it fits VCF.
 2. [`OPEN-QUESTIONS.md`](OPEN-QUESTIONS.md) — what we need your input on. **This is where to collaborate.**
-3. [`PRD.md`](PRD.md) §1–3 — the vision, goals, and who it's for, in more depth.
+3. [`DIRECTUS.md`](DIRECTUS.md) — what Directus is (the free tool volunteers will author content in), in plain language.
+4. [`PRD.md`](PRD.md) §1–3 — the vision, goals, and who it's for, in more depth.
 
 **You want to build it (developers):**
 1. [`PRD.md`](PRD.md) — product requirements: vision, personas, the four deliverable forms, scope.
@@ -27,6 +28,7 @@ ExhibitOS does but *why* every decision was made.
 | [`UX-SPEC.md`](UX-SPEC.md) | Authoring flow (in Directus), the three render targets (incl. landscape **and** portrait cards), the central dashboard, accessibility, and the design language. |
 | [`DEV-PLAN.md`](DEV-PLAN.md) | Epics → stories with acceptance criteria, sequenced v1 build order, definition of done. |
 | [`VCF-PROPOSAL.md`](VCF-PROPOSAL.md) | The museum-facing pitch — opportunity, solution, pilot, cost, and ask. |
+| [`DIRECTUS.md`](DIRECTUS.md) | Plain-language primer on Directus — the free, self-hosted content tool ExhibitOS is built on, and why we chose it. |
 | [`OPEN-QUESTIONS.md`](OPEN-QUESTIONS.md) | Decisions already locked + the questions still open for VCF collaboration. |
 
 ## Core idea, in one line
