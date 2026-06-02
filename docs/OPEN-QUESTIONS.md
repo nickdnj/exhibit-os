@@ -14,7 +14,7 @@ decided** and **what's still open** — especially the things we need **VCF / mu
 
 These are settled (see [`PRD.md`](PRD.md) §9 and [`ARCHITECTURE.md`](ARCHITECTURE.md) for rationale):
 
-- **Content lives in Directus** (free self-hosted CMS); ExhibitOS renders it. Author once, publish everywhere.
+- **Content lives in the museum's docent wiki** (where docents already author, with built-in revision control); ExhibitOS **ingests** and renders it. A self-hosted CMS (Directus) was evaluated and deferred — see [`decisions/0001-content-source.md`](decisions/0001-content-source.md).
 - **One deployment per museum** — fully isolated; "generic platform" means anyone can deploy the same code.
 - **Kiosk video is self-hosted HTML5** (no YouTube embedded on a public kiosk — escape risk); YouTube is for the phone/QR deep-dive only. Kiosk browsers are locked to the ExhibitOS origin.
 - **Interpretive cards render on-screen and export to print** (Playwright), matching InfoAge's existing sign style — in **both landscape and portrait**.
@@ -52,12 +52,11 @@ These shape the build and are the best places to collaborate.
   VCF would own the day-to-day (adding exhibits, managing displays) once it's stood up? This shapes
   how much we automate and what the runbook must cover.
 
-### 6. Directus licensing
-- Directus (the content tool — see [`DIRECTUS.md`](DIRECTUS.md)) is free to self-host, in
-  production with no feature limits, for organizations with **under $5M in total annual income**
-  (revenue + budget + funding, whichever is largest) under its Monospace Sustainable Core License.
-  We expect VCF (a 501(c)(3) nonprofit) qualifies easily — just need a quick confirmation of the
-  figure to document it.
+### 6. Wiki access for ingest
+- ExhibitOS needs a read path into the docent wiki (DokuWiki) to ingest exhibit content — the wiki's
+  API with a read-only docent account, or a scheduled export. Need to confirm the wiki's API is
+  enabled and agree on an access method. *(Directus licensing is no longer a question — Directus was
+  deferred; see [`decisions/0001-content-source.md`](decisions/0001-content-source.md).)*
 
 ---
 

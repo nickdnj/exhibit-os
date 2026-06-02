@@ -1,8 +1,14 @@
 # Understanding Directus — the content backbone
 
-> **Who this is for:** anyone (museum staff included) who wants to understand *what Directus is*
-> and *why ExhibitOS is built on it* — no technical background assumed. For the developer-level
-> detail (the data model, sync, the API token), see [`ARCHITECTURE.md`](ARCHITECTURE.md).
+> 🔖 **Status (2026-06-02): evaluated and DEFERRED — not currently used.** We compared a self-hosted
+> CMS (Directus) against using the museum's existing docent wiki, and chose the wiki as the content
+> source of truth (simpler, less to run, reuses the docents' tools and revision control). See
+> [`decisions/0001-content-source.md`](decisions/0001-content-source.md). This page is retained as
+> background and as a documented future option if the museum later needs richer media management or
+> many concurrent authors with formal roles.
+
+> **Who this is for:** anyone (museum staff included) who wants to understand *what Directus is* — no
+> technical background assumed.
 
 ## The one-sentence version
 

@@ -47,14 +47,18 @@ with embedded video) so the story continues after they walk away.
 
 ## How it works
 
-Content lives in **[Directus](docs/DIRECTUS.md)** — a free, self-hosted, open-source CMS with no
-feature paywall for a nonprofit ([what is Directus?](docs/DIRECTUS.md)). A volunteer authors an exhibit there once (with roles, drafts, and
-an approval step so the live signs can't break by accident). ExhibitOS reads that content
-and **renders it to every screen by device type**, caches it locally so a network blip
-never blanks the gallery, and controls the physical fleet from its dashboard. The whole
-stack runs in **Docker on a single mini PC**; the screens themselves are cheap — ~$20
-streaming sticks, Raspberry Pis, or repurposed legacy PCs. Software cost is effectively
-zero; it's MIT-licensed end to end.
+**The museum keeps authoring exhibit content where it already does — in its docent wiki** (which
+already gives them revision history, diffs, and attribution for free). ExhibitOS **ingests** that
+content and **renders it to every screen by device type**, caches it locally so a network blip never
+blanks the gallery, and controls the physical fleet from its dashboard. ExhibitOS owns only what the
+wiki doesn't: which screen shows what, scheduling, and the display assets (hero images, looping
+video). The whole stack runs in **Docker on a single mini PC**; the screens themselves are cheap —
+~$20 streaming sticks, Raspberry Pis, or repurposed legacy PCs. Software cost is effectively zero;
+it's MIT-licensed end to end.
+
+> **Content architecture:** we evaluated a self-hosted CMS (Directus) and chose instead to use the
+> museum's existing wiki as the source of truth — simpler, less to run, and it reuses the docents'
+> tools and revision control. See [decisions/0001-content-source.md](docs/decisions/0001-content-source.md).
 
 ## Run it locally
 

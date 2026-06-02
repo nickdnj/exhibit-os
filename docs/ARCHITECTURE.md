@@ -1,5 +1,12 @@
 # Technical Architecture: ExhibitOS
 
+> ⚠️ **Content-source decision superseded (2026-06-02).** This document describes Directus as the
+> content system of record. That decision was reversed: the museum's existing **docent wiki** is the
+> source of truth and ExhibitOS **ingests** from it; Directus is deferred. See
+> [`decisions/0001-content-source.md`](decisions/0001-content-source.md). The Directus-specific
+> sections below are retained for reference and will be revised when the wiki-ingest design is built.
+> **The render, fleet, Display Profile, caching, and deployment sections are unaffected.**
+
 **Version:** 0.2
 **Last Updated:** 2026-06-01
 **Author:** Software Architecture (AI-assisted), for Nick DeMarco

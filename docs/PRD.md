@@ -1,5 +1,11 @@
 # Product Requirements Document: ExhibitOS
 
+> ⚠️ **Content-source decision superseded (2026-06-02).** This PRD names Directus as the system of
+> record (§9a and the principles in §1–2). That was reversed: the museum's existing **docent wiki**
+> is the content source of truth and ExhibitOS **ingests** from it; Directus is deferred. See
+> [`decisions/0001-content-source.md`](decisions/0001-content-source.md). The four deliverable forms,
+> personas, and scope are otherwise unchanged.
+
 **Version:** 0.1 (first draft)
 **Last Updated:** 2026-05-31
 **Author:** Nick DeMarco, with AI assistance
