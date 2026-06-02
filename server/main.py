@@ -92,6 +92,10 @@ async def lifespan(app: FastAPI):
     mark_started()
     logger.info("ExhibitOS starting up...")
 
+    # Capture the running loop so sync request handlers can push WS broadcasts
+    import asyncio
+    ws_manager.set_loop(asyncio.get_running_loop())
+
     # Create tables
     Base.metadata.create_all(bind=engine)
     ensure_settings_schema()

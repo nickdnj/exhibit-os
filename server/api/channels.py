@@ -110,6 +110,8 @@ def update_channel(channel_id: int, request: ChannelUpdate, db: Session = Depend
 
     db.commit()
     db.refresh(channel)
+    from ..ws.manager import ws_manager
+    ws_manager.notify_page_update_sync(channel.slug)
     return channel_to_dict(channel, include_pages=True)
 
 
@@ -139,6 +141,8 @@ def assign_pages(channel_id: int, request: BulkPageAssignment, db: Session = Dep
 
     db.commit()
     db.refresh(channel)
+    from ..ws.manager import ws_manager
+    ws_manager.notify_page_update_sync(channel.slug)
     return channel_to_dict(channel, include_pages=True)
 
 

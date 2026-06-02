@@ -19,6 +19,13 @@ class ConnectionManager:
         self.admin_clients: list[WebSocket] = []
         # Heartbeat tracking: {websocket: last_heartbeat_time}
         self._heartbeats: dict[WebSocket, datetime] = {}
+        # Main event loop, captured at startup so sync (threadpool) request
+        # handlers can schedule broadcasts onto it via run_coroutine_threadsafe.
+        self._loop: Optional[asyncio.AbstractEventLoop] = None
+
+    def set_loop(self, loop: asyncio.AbstractEventLoop) -> None:
+        """Capture the running event loop (called once during app startup)."""
+        self._loop = loop
 
     async def connect_display(self, websocket: WebSocket, channel_slug: str):
         await websocket.accept()
@@ -81,6 +88,23 @@ class ConnectionManager:
             await self.broadcast_to_channel(channel_slug, message)
         else:
             await self.broadcast_to_all_displays(message)
+
+    def notify_page_update_sync(self, channel_slug: Optional[str] = None) -> None:
+        """Schedule a page-update broadcast from synchronous (threadpool) code.
+
+        Sync FastAPI route handlers run in a worker thread with no event loop,
+        so `asyncio.create_task` is unavailable there. We instead schedule the
+        coroutine onto the main loop captured at startup. No-ops safely if the
+        loop isn't running (e.g. during tests).
+        """
+        loop = self._loop
+        if loop is None or not loop.is_running():
+            logger.debug("notify_page_update_sync: no running loop; skipping push")
+            return
+        try:
+            asyncio.run_coroutine_threadsafe(self.notify_page_update(channel_slug), loop)
+        except Exception:
+            logger.exception("Failed to schedule page-update broadcast")
 
     def get_status(self) -> dict:
         """Return connection status for admin dashboard."""

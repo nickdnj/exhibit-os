@@ -2,7 +2,6 @@ from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File,
 from sqlalchemy.orm import Session
 from pydantic import BaseModel
 from typing import Optional
-import asyncio
 import json
 import os
 import shutil
@@ -15,9 +14,13 @@ from .auth import get_current_user
 
 
 def _notify_page_change():
-    """Notify display clients that pages changed (runs in background)."""
+    """Notify display clients that pages changed.
+
+    Called from sync route handlers (threadpool, no event loop), so it schedules
+    the broadcast onto the captured main loop rather than using create_task.
+    """
     from ..ws.manager import ws_manager
-    asyncio.create_task(ws_manager.notify_page_update())
+    ws_manager.notify_page_update_sync()
 
 router = APIRouter(prefix="/api/pages", tags=["pages"])
 settings = get_settings()
@@ -97,6 +100,7 @@ def create_page(request: PageCreate, db: Session = Depends(get_db), _user=Depend
     db.add(page)
     db.commit()
     db.refresh(page)
+    _notify_page_change()
     return page_to_dict(page)
 
 
@@ -121,6 +125,7 @@ def create_announcement(request: PageWithAnnouncement, db: Session = Depends(get
     db.add(announcement)
     db.commit()
     db.refresh(page)
+    _notify_page_change()
     return page_to_dict(page)
 
 
@@ -139,6 +144,7 @@ def update_page(page_id: int, request: PageUpdate, db: Session = Depends(get_db)
 
     db.commit()
     db.refresh(page)
+    _notify_page_change()
     return page_to_dict(page)
 
 
@@ -169,6 +175,7 @@ def update_announcement(
 
     db.commit()
     db.refresh(page)
+    _notify_page_change()
     return page_to_dict(page)
 
 
@@ -186,6 +193,7 @@ def delete_page(page_id: int, db: Session = Depends(get_db), _user=Depends(get_c
 
     db.delete(page)
     db.commit()
+    _notify_page_change()
 
 
 @router.post("/{page_id}/image")
@@ -216,4 +224,5 @@ async def upload_image(
     page.image_path = f"/uploads/{filename}"
     db.commit()
     db.refresh(page)
+    _notify_page_change()
     return page_to_dict(page)
