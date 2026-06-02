@@ -17,7 +17,7 @@ interface HealthData {
 export default function AdminDashboard() {
   const [channels, setChannels] = useState<ChannelStatus[]>([]);
   const [health, setHealth] = useState<HealthData | null>(null);
-  const token = localStorage.getItem('signboard_token');
+  const token = localStorage.getItem('exhibitos_token');
 
   useEffect(() => {
     const headers = { Authorization: `Bearer ${token}` };

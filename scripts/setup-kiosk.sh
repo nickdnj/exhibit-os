@@ -1,19 +1,19 @@
 #!/bin/bash
-# SignBoard Pi Kiosk Setup Script
+# ExhibitOS Pi Kiosk Setup Script
 # Run on a fresh Raspberry Pi OS Lite installation
 #
-# Usage: sudo bash setup-kiosk.sh <signboard-url> <channel-slug>
+# Usage: sudo bash setup-kiosk.sh <exhibitos-url> <channel-slug>
 # Example: sudo bash setup-kiosk.sh http://192.168.12.136:8100 office
 
 set -e
 
-SIGNBOARD_URL="${1:-http://192.168.12.136:8100}"
+EXHIBITOS_URL="${1:-http://192.168.12.136:8100}"
 CHANNEL_SLUG="${2:-office}"
-DISPLAY_URL="${SIGNBOARD_URL}/display/${CHANNEL_SLUG}"
+DISPLAY_URL="${EXHIBITOS_URL}/display/${CHANNEL_SLUG}"
 PI_USER="${SUDO_USER:-pi}"
 
 echo "============================================"
-echo "  SignBoard Pi Kiosk Setup"
+echo "  ExhibitOS Pi Kiosk Setup"
 echo "  URL: ${DISPLAY_URL}"
 echo "  User: ${PI_USER}"
 echo "============================================"
@@ -34,13 +34,13 @@ echo "  Done."
 echo "[2/7] Creating kiosk script..."
 cat > /home/${PI_USER}/kiosk.sh << 'KIOSK_EOF'
 #!/bin/bash
-# SignBoard Kiosk - launched by systemd
+# ExhibitOS Kiosk - launched by systemd
 
-SIGNBOARD_URL="__SIGNBOARD_URL__"
+EXHIBITOS_URL="__EXHIBITOS_URL__"
 DISPLAY_URL="__DISPLAY_URL__"
 
 # Wait for server to be reachable
-until curl -s -o /dev/null -w '%{http_code}' "${SIGNBOARD_URL}/api/health" 2>/dev/null | grep -q "200"; do
+until curl -s -o /dev/null -w '%{http_code}' "${EXHIBITOS_URL}/api/health" 2>/dev/null | grep -q "200"; do
     sleep 5
 done
 
@@ -83,7 +83,7 @@ exec chromium \
 KIOSK_EOF
 
 # Replace placeholders
-sed -i "s|__SIGNBOARD_URL__|${SIGNBOARD_URL}|g" /home/${PI_USER}/kiosk.sh
+sed -i "s|__EXHIBITOS_URL__|${EXHIBITOS_URL}|g" /home/${PI_USER}/kiosk.sh
 sed -i "s|__DISPLAY_URL__|${DISPLAY_URL}|g" /home/${PI_USER}/kiosk.sh
 chmod +x /home/${PI_USER}/kiosk.sh
 chown ${PI_USER}:${PI_USER} /home/${PI_USER}/kiosk.sh
@@ -91,9 +91,9 @@ echo "  Done."
 
 # Step 3: Create systemd service
 echo "[3/7] Creating systemd service..."
-cat > /etc/systemd/system/signboard-kiosk.service << EOF
+cat > /etc/systemd/system/exhibitos-kiosk.service << EOF
 [Unit]
-Description=SignBoard Kiosk Display
+Description=ExhibitOS Kiosk Display
 After=network-online.target
 Wants=network-online.target
 
@@ -147,7 +147,7 @@ echo "[6/7] SD card protection..."
 echo "  NOTE: Run 'sudo raspi-config' -> Performance -> Overlay File System -> Enable"
 echo "  This makes the root filesystem read-only, preventing SD card corruption."
 echo "  All writes go to a tmpfs overlay that's lost on reboot."
-echo "  The SignBoard server stores all data, so the Pi needs no persistent storage."
+echo "  The ExhibitOS server stores all data, so the Pi needs no persistent storage."
 echo ""
 
 # Step 7: Configure watchdog
@@ -164,19 +164,19 @@ echo "  Done."
 
 # Enable the service
 systemctl daemon-reload
-systemctl enable signboard-kiosk.service
+systemctl enable exhibitos-kiosk.service
 
 echo ""
 echo "============================================"
 echo "  Setup complete!"
 echo ""
 echo "  Display URL: ${DISPLAY_URL}"
-echo "  Service: signboard-kiosk.service"
+echo "  Service: exhibitos-kiosk.service"
 echo ""
 echo "  Next steps:"
 echo "  1. Reboot: sudo reboot"
 echo "  2. The Pi will auto-login, start X, and"
-echo "     launch Chromium pointed at SignBoard."
+echo "     launch Chromium pointed at ExhibitOS."
 echo "  3. Enable overlayfs via raspi-config for"
 echo "     SD card protection."
 echo "============================================"

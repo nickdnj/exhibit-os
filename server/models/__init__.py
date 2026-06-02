@@ -6,6 +6,3 @@ from .announcement import Announcement
 from .setting import Setting
 from .admin_user import AdminUser
 from .audit_log import AuditLog
-from .tide_station import TideStation
-from .fishing_location import FishingLocation
-from .surf_spot import SurfSpot

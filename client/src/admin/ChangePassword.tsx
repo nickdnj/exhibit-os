@@ -8,7 +8,7 @@ export default function ChangePassword() {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
-  const token = localStorage.getItem('signboard_token');
+  const token = localStorage.getItem('exhibitos_token');
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

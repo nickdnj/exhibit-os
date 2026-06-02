@@ -26,7 +26,7 @@ export default function Login() {
       }
 
       const data = await resp.json();
-      localStorage.setItem('signboard_token', data.access_token);
+      localStorage.setItem('exhibitos_token', data.access_token);
 
       if (data.must_change_password) {
         navigate('/admin/change-password');
@@ -44,9 +44,8 @@ export default function Login() {
     <div className="min-h-screen bg-[#0B1F3A] flex items-center justify-center p-4">
       <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm p-8">
         <div className="text-center mb-8">
-          <p className="text-3xl mb-2">⚓</p>
-          <h1 className="text-xl font-bold text-gray-800">SignBoard Admin</h1>
-          <p className="text-gray-400 text-sm mt-1">Wharfside Manor</p>
+          <h1 className="text-xl font-bold text-gray-800">ExhibitOS Admin</h1>
+          <p className="text-gray-400 text-sm mt-1">VCF Museum @ InfoAge</p>
         </div>
 
         <form onSubmit={handleSubmit}>

@@ -10,14 +10,11 @@ const tabs = [
   { id: 'dashboard', label: 'Home', icon: '🏠' },
   { id: 'channels', label: 'Channels', icon: '📺' },
   { id: 'pages', label: 'Pages', icon: '📄' },
-  { id: 'tides', label: 'Tides', icon: '🌊' },
-  { id: 'fishing', label: 'Fishing', icon: '🎣' },
-  { id: 'surf', label: 'Surf', icon: '🏄' },
   { id: 'settings', label: 'Settings', icon: '⚙️' },
 ];
 
 export default function AdminLayout({ children, activeTab, onTabChange }: AdminLayoutProps) {
-  const token = localStorage.getItem('signboard_token');
+  const token = localStorage.getItem('exhibitos_token');
   if (!token) return <Navigate to="/admin/login" replace />;
 
   return (
@@ -25,8 +22,8 @@ export default function AdminLayout({ children, activeTab, onTabChange }: AdminL
       {/* Desktop sidebar */}
       <aside className="hidden md:flex fixed left-0 top-0 bottom-0 w-56 flex-col bg-[#0B1F3A] text-white z-20">
         <div className="p-4 border-b border-white/10">
-          <p className="text-[#C9960C] font-bold text-lg">⚓ SignBoard</p>
-          <p className="text-white/50 text-xs mt-1">Wharfside Manor</p>
+          <p className="text-[#C9960C] font-bold text-lg">ExhibitOS</p>
+          <p className="text-white/50 text-xs mt-1">VCF Museum @ InfoAge</p>
         </div>
         <nav className="flex-1 p-2">
           {tabs.map((tab) => (
@@ -47,7 +44,7 @@ export default function AdminLayout({ children, activeTab, onTabChange }: AdminL
         <div className="p-4 border-t border-white/10">
           <button
             onClick={() => {
-              localStorage.removeItem('signboard_token');
+              localStorage.removeItem('exhibitos_token');
               window.location.href = '/admin/login';
             }}
             className="text-white/50 text-sm hover:text-white"

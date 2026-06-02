@@ -1,23 +1,23 @@
 #!/bin/bash
-# SignBoard Pi first-boot provisioner — Stage 2.
+# ExhibitOS Pi first-boot provisioner — Stage 2.
 #
 # Runs as a oneshot systemd service on the FIRST boot where network is up.
 # Installs Comitup (WiFi AP fallback) and the Chromium kiosk stack, then
 # invokes the existing setup-kiosk.sh with the configured KIOSK_URL.
 #
-# Log: /var/log/signboard-stage2.log
+# Log: /var/log/exhibitos-stage2.log
 
 set +e
 echo "=== stage2 started at $(date -u +%FT%TZ) ==="
 
-CONF=/boot/firmware/signboard.conf
+CONF=/boot/firmware/exhibitos.conf
 KIOSK_INSTALLER=/boot/firmware/setup-kiosk.sh
-DONE=/var/lib/signboard/stage2-done
+DONE=/var/lib/exhibitos/stage2-done
 mkdir -p "$(dirname "$DONE")"
 
 # shellcheck source=/dev/null
 . "$CONF"
-: "${KIOSK_URL:=https://signboard.vistter.com/display/pool}"
+: "${KIOSK_URL:=https://exhibitos.example.com/display/lobby}"
 
 # Wait for internet
 for i in $(seq 1 30); do
@@ -78,7 +78,7 @@ echo "=== stage2 finished at $(date -u +%FT%TZ) ==="
 touch "$DONE"
 
 # Disable ourselves
-systemctl disable signboard-stage2.service 2>/dev/null || true
+systemctl disable exhibitos-stage2.service 2>/dev/null || true
 
 # Reboot into kiosk
 (sleep 5 && reboot) &

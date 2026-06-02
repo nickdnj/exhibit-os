@@ -3,9 +3,6 @@ import AdminLayout from './AdminLayout';
 import AdminDashboard from './AdminDashboard';
 import ChannelManager from './ChannelManager';
 import PageManager from './PageManager';
-import TideStationManager from './TideStationManager';
-import FishingLocationManager from './FishingLocationManager';
-import SurfSpotManager from './SurfSpotManager';
 import Settings from './Settings';
 
 export default function AdminApp() {
@@ -19,12 +16,6 @@ export default function AdminApp() {
         return <ChannelManager />;
       case 'pages':
         return <PageManager />;
-      case 'tides':
-        return <TideStationManager />;
-      case 'fishing':
-        return <FishingLocationManager />;
-      case 'surf':
-        return <SurfSpotManager />;
       case 'settings':
         return <Settings onNavigate={setActiveTab} />;
       default:

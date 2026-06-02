@@ -6,7 +6,7 @@ from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 
 from .manager import ws_manager
 
-logger = logging.getLogger("signboard.ws")
+logger = logging.getLogger("exhibitos.ws")
 router = APIRouter()
 
 

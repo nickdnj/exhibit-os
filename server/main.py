@@ -14,26 +14,14 @@ from .api.auth import router as auth_router, hash_password
 from .api.health import router as health_router, update_service_status
 from .api.pages import router as pages_router
 from .api.channels import router as channels_router
-from .api.weather import router as weather_router
-from .api.tides import router as tides_router
-from .api.tide_stations import router as tide_stations_router
-from .api.fishing import router as fishing_router
-from .api.fishing_locations import router as fishing_locations_router
-from .api.surf import router as surf_router
-from .api.surf_spots import router as surf_spots_router
 from .api.settings import router as settings_router
 from .api.admin import router as admin_router, install_log_ring_buffer, mark_started
-from .api.lightning import router as lightning_router
-from .services.lightning import lightning_service
 from .services.settings_service import settings_service
-from .services.tempest import weather_service
-from .services.tides import tide_service
-from .services.surf import surf_service
 from .ws.routes import router as ws_router
 from .ws.manager import ws_manager
 
 settings = get_settings()
-logger = logging.getLogger("signboard")
+logger = logging.getLogger("exhibitos")
 
 
 def ensure_settings_schema():
@@ -84,147 +72,17 @@ def seed_default_admin():
 
 
 def seed_default_channels():
-    """Create office and pool channels if none exist."""
+    """Create default display channels if none exist."""
     from .models.channel import Channel
 
     with get_session() as db:
         existing = db.query(Channel).first()
         if not existing:
-            office = Channel(name="Marina Office", slug="office", rotation_interval=30)
-            pool = Channel(name="Pool Area", slug="pool", rotation_interval=30)
-            db.add_all([office, pool])
+            lobby = Channel(name="Lobby", slug="lobby", rotation_interval=30)
+            gallery = Channel(name="Gallery", slug="gallery", rotation_interval=30)
+            db.add_all([lobby, gallery])
             db.commit()
-            logger.info("Created default channels: office, pool")
-
-
-def seed_system_pages():
-    """Create system pages (weather, tides) if none exist."""
-    from .models.page import Page
-
-    with get_session() as db:
-        required = [
-            ("Current Weather", "weather_current"),
-            ("5-Hour Forecast", "weather_hourly"),
-            ("5-Day Forecast", "weather_forecast"),
-            ("Tides", "tide_current"),
-            ("Fishing Report", "fishing_report"),
-            ("Surf Report", "surf_report"),
-        ]
-        for title, page_type in required:
-            existing = db.query(Page).filter(Page.page_type == page_type).first()
-            if not existing:
-                db.add(Page(title=title, page_type=page_type, is_system=True, is_published=True))
-                logger.info("Created system page: %s", page_type)
-        db.commit()
-
-
-def seed_surf_spots():
-    """Seed ocean-facing surf spots on first run."""
-    from .models.surf_spot import SurfSpot
-
-    with get_session() as db:
-        if db.query(SurfSpot).first():
-            return
-
-        seeds = [
-            # NJ Atlantic coast faces roughly east (90°), so shore_facing_deg=90
-            {"name": "Monmouth Beach", "latitude": 40.3340, "longitude": -73.9780,
-             "shore_facing_deg": 90, "is_local": True, "sort_order": 0},
-            {"name": "Long Branch Fishing Pier", "latitude": 40.2970, "longitude": -73.9780,
-             "shore_facing_deg": 90, "sort_order": 1},
-            {"name": "Shrewsbury Rocks", "latitude": 40.3700, "longitude": -73.9400,
-             "shore_facing_deg": 90, "sort_order": 2},
-            {"name": "Sandy Hook", "latitude": 40.4670, "longitude": -73.9770,
-             "shore_facing_deg": 90, "sort_order": 3},
-        ]
-        for s in seeds:
-            db.add(SurfSpot(**s, enabled=True))
-        db.commit()
-        logger.info("Seeded %d surf spots", len(seeds))
-
-
-def seed_fishing_locations():
-    """Seed Monmouth County NJ fishing locations on first run."""
-    from .models.fishing_location import FishingLocation
-    from .models.tide_station import TideStation
-
-    with get_session() as db:
-        if db.query(FishingLocation).first():
-            return
-
-        # Map NOAA station IDs to DB station IDs
-        stations = {s.noaa_id: s.id for s in db.query(TideStation).all()}
-
-        seeds = [
-            {
-                "name": "Shrewsbury River",
-                "latitude": 40.3300, "longitude": -74.0000,
-                "tide_station_noaa": "8531712",  # Long Branch Reach
-                "is_local": True,
-                "sort_order": 0,
-            },
-            {
-                "name": "Monmouth Beach",
-                "latitude": 40.3340, "longitude": -73.9780,
-                "tide_station_noaa": "8531991",  # Long Branch Fishing Pier
-                "sort_order": 1,
-            },
-            {
-                "name": "Shrewsbury Rocks",
-                "latitude": 40.3700, "longitude": -73.9400,
-                "tide_station_noaa": "8531680",  # Sandy Hook
-                "sort_order": 2,
-            },
-            {
-                "name": "Raritan Bay",
-                "latitude": 40.4800, "longitude": -74.2500,
-                "tide_station_noaa": "8531680",  # Sandy Hook — nearest MLLW ref station
-                "sort_order": 3,
-            },
-        ]
-
-        for s in seeds:
-            station_noaa = s.pop("tide_station_noaa")
-            db.add(FishingLocation(
-                **s,
-                tide_station_id=stations.get(station_noaa),
-                enabled=True,
-            ))
-        db.commit()
-        logger.info("Seeded %d fishing locations", len(seeds))
-
-
-def seed_tide_stations():
-    """Seed tide stations from NOAA_STATIONS env on first run."""
-    from .models.tide_station import TideStation
-
-    with get_session() as db:
-        if db.query(TideStation).first():
-            return
-
-        # Parse "id:name[:local],id:name[:local]"
-        entries = []
-        raw = settings.noaa_stations.strip()
-        if raw:
-            for i, chunk in enumerate(raw.split(",")):
-                parts = chunk.strip().split(":")
-                if len(parts) < 2:
-                    continue
-                entries.append({
-                    "noaa_id": parts[0].strip(),
-                    "name": parts[1].strip(),
-                    "is_local": len(parts) > 2 and parts[2].strip().lower() == "local",
-                    "sort_order": i,
-                })
-        # Fallback: legacy single-station env var
-        if not entries and settings.noaa_station_id:
-            entries.append({"noaa_id": settings.noaa_station_id, "name": "Tide Station", "is_local": True, "sort_order": 0})
-
-        for e in entries:
-            db.add(TideStation(**e, enabled=True))
-        if entries:
-            db.commit()
-            logger.info("Seeded %d tide stations", len(entries))
+            logger.info("Created default channels: lobby, gallery")
 
 
 @asynccontextmanager
@@ -232,7 +90,7 @@ async def lifespan(app: FastAPI):
     # Startup
     install_log_ring_buffer()
     mark_started()
-    logger.info("SignBoard starting up...")
+    logger.info("ExhibitOS starting up...")
 
     # Create tables
     Base.metadata.create_all(bind=engine)
@@ -242,10 +100,6 @@ async def lifespan(app: FastAPI):
     # Seed data
     seed_default_admin()
     seed_default_channels()
-    seed_system_pages()
-    seed_tide_stations()
-    seed_fishing_locations()
-    seed_surf_spots()
     settings_service.seed_defaults()
 
     # Ensure uploads directory exists
@@ -254,27 +108,15 @@ async def lifespan(app: FastAPI):
     # Mark database as healthy
     update_service_status("database", "healthy")
 
-    # Start background services
-    await weather_service.start()
-    await tide_service.start()
-    await surf_service.start()
-    await lightning_service.start()
-
     yield
 
-    # Stop background services
-    await weather_service.stop()
-    await tide_service.stop()
-    await surf_service.stop()
-    await lightning_service.stop()
-
     # Shutdown
-    logger.info("SignBoard shutting down...")
+    logger.info("ExhibitOS shutting down...")
 
 
 app = FastAPI(
-    title="SignBoard",
-    description="Wharfside Manor Digital Signage System",
+    title="ExhibitOS",
+    description="Open information-display platform for museums and exhibits",
     version="0.1.0",
     lifespan=lifespan,
 )
@@ -293,16 +135,8 @@ app.include_router(auth_router)
 app.include_router(health_router)
 app.include_router(pages_router)
 app.include_router(channels_router)
-app.include_router(weather_router)
-app.include_router(tides_router)
-app.include_router(tide_stations_router)
-app.include_router(fishing_router)
-app.include_router(fishing_locations_router)
-app.include_router(surf_router)
-app.include_router(surf_spots_router)
 app.include_router(settings_router)
 app.include_router(admin_router)
-app.include_router(lightning_router)
 app.include_router(ws_router)
 
 # Serve uploaded files

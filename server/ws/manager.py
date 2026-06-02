@@ -6,7 +6,7 @@ from typing import Optional
 
 from fastapi import WebSocket
 
-logger = logging.getLogger("signboard.ws")
+logger = logging.getLogger("exhibitos.ws")
 
 
 class ConnectionManager:
@@ -81,11 +81,6 @@ class ConnectionManager:
             await self.broadcast_to_channel(channel_slug, message)
         else:
             await self.broadcast_to_all_displays(message)
-
-    async def send_weather_update(self, weather_data: dict):
-        """Push weather data to all display clients."""
-        message = {"type": "weather_update", "payload": weather_data, "timestamp": datetime.now(timezone.utc).isoformat()}
-        await self.broadcast_to_all_displays(message)
 
     def get_status(self) -> dict:
         """Return connection status for admin dashboard."""

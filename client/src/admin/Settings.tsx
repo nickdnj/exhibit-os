@@ -3,13 +3,11 @@ import { useNavigate } from 'react-router-dom';
 import type { SettingItem, HealthResponse, LogLine, SystemInfo } from '../api';
 import { fetchSettings, updateSettings, fetchHealth, fetchLogs, fetchSystemInfo, backupUrl } from '../api';
 
-const GROUP_ORDER = ['weather', 'integrations', 'display', 'lightning', 'system'];
+const GROUP_ORDER = ['integrations', 'display', 'system'];
 
 const GROUP_LABELS: Record<string, { title: string; icon: string; desc: string }> = {
-  weather: { title: 'Weather', icon: '🌤', desc: 'Tempest station and timezone' },
   integrations: { title: 'Integrations', icon: '🔗', desc: 'External services' },
-  display: { title: 'Display & Rotation', icon: '📺', desc: 'Page rotation behavior' },
-  lightning: { title: 'Lightning Safety', icon: '⚡', desc: 'Pool alert configuration' },
+  display: { title: 'Display & Rotation', icon: '📺', desc: 'Page rotation behavior and timezone' },
   system: { title: 'System', icon: '⚙️', desc: 'Logging and CORS' },
 };
 
@@ -18,7 +16,7 @@ interface SettingsProps {
 }
 
 export default function Settings({ onNavigate }: SettingsProps) {
-  const token = localStorage.getItem('signboard_token') || '';
+  const token = localStorage.getItem('exhibitos_token') || '';
   const navigate = useNavigate();
 
   const [items, setItems] = useState<SettingItem[]>([]);
@@ -82,7 +80,7 @@ export default function Settings({ onNavigate }: SettingsProps) {
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = resp.headers.get('Content-Disposition')?.match(/filename=([^;]+)/)?.[1]?.replace(/"/g, '') || 'signboard.db';
+    a.download = resp.headers.get('Content-Disposition')?.match(/filename=([^;]+)/)?.[1]?.replace(/"/g, '') || 'exhibitos.db';
     document.body.appendChild(a);
     a.click();
     a.remove();
@@ -138,7 +136,7 @@ export default function Settings({ onNavigate }: SettingsProps) {
     <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-bold text-gray-800">Settings</h1>
-        <p className="text-gray-500 text-sm mt-1">Configure weather, integrations, and system behavior.</p>
+        <p className="text-gray-500 text-sm mt-1">Configure integrations and system behavior.</p>
       </div>
 
       {error && (
@@ -224,9 +222,6 @@ export default function Settings({ onNavigate }: SettingsProps) {
         <div className="grid grid-cols-2 gap-3">
           <LinkTile label="Channels" icon="📺" onClick={() => onNavigate?.('channels')} />
           <LinkTile label="Pages" icon="📄" onClick={() => onNavigate?.('pages')} />
-          <LinkTile label="Tide Stations" icon="🌊" onClick={() => onNavigate?.('tides')} />
-          <LinkTile label="Fishing Locations" icon="🎣" onClick={() => onNavigate?.('fishing')} />
-          <LinkTile label="Surf Spots" icon="🏄" onClick={() => onNavigate?.('surf')} />
         </div>
       </section>
 
@@ -244,7 +239,7 @@ export default function Settings({ onNavigate }: SettingsProps) {
           <div className="flex items-center justify-between">
             <div>
               <p className="font-medium text-gray-800">Database Backup</p>
-              <p className="text-sm text-gray-500">Download a consistent snapshot of signboard.db</p>
+              <p className="text-sm text-gray-500">Download a consistent snapshot of exhibitos.db</p>
             </div>
             <button onClick={handleBackup} className="px-4 py-2 bg-[#0B1F3A] text-white rounded hover:bg-[#162d52]">
               Download .db
@@ -296,7 +291,7 @@ export default function Settings({ onNavigate }: SettingsProps) {
           <span className="text-2xl">ℹ️</span>
           <div>
             <h2 className="font-bold text-gray-800">About</h2>
-            <p className="text-gray-500 text-sm">SignBoard build info</p>
+            <p className="text-gray-500 text-sm">ExhibitOS build info</p>
           </div>
         </header>
         <dl className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm">

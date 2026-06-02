@@ -52,14 +52,14 @@ _ring_handler: Optional[RingBufferHandler] = None
 
 
 def install_log_ring_buffer():
-    """Attach the ring buffer to the root signboard logger. Called at startup."""
+    """Attach the ring buffer to the root exhibitos logger. Called at startup."""
     global _ring_handler
     if _ring_handler is not None:
         return _ring_handler
     _ring_handler = RingBufferHandler()
     _ring_handler.setLevel(logging.INFO)
     _ring_handler.setFormatter(logging.Formatter("%(message)s"))
-    logging.getLogger("signboard").addHandler(_ring_handler)
+    logging.getLogger("exhibitos").addHandler(_ring_handler)
     # Also capture uvicorn access/error
     logging.getLogger("uvicorn").addHandler(_ring_handler)
     return _ring_handler
@@ -84,7 +84,7 @@ def get_logs(
 def download_backup(_user=Depends(get_current_user)):
     """Stream a consistent SQLite snapshot to the caller."""
     settings = get_settings()
-    # database_url looks like "sqlite:////data/signboard.db"
+    # database_url looks like "sqlite:////data/exhibitos.db"
     db_path = settings.database_url.replace("sqlite:///", "", 1)
     # Handle both sqlite:////abs/path and sqlite:///relative
     if db_path.startswith("/"):
@@ -96,7 +96,7 @@ def download_backup(_user=Depends(get_current_user)):
         raise HTTPException(status_code=404, detail="Database file not found")
 
     # Use SQLite's online backup API for a consistent snapshot
-    fd, tmp_path = tempfile.mkstemp(prefix="signboard-backup-", suffix=".db")
+    fd, tmp_path = tempfile.mkstemp(prefix="exhibitos-backup-", suffix=".db")
     os.close(fd)
     src_conn = sqlite3.connect(source)
     dst_conn = sqlite3.connect(tmp_path)
@@ -106,7 +106,7 @@ def download_backup(_user=Depends(get_current_user)):
         dst_conn.close()
         src_conn.close()
 
-    filename = f"signboard-{datetime.now().strftime('%Y%m%d-%H%M%S')}.db"
+    filename = f"exhibitos-{datetime.now().strftime('%Y%m%d-%H%M%S')}.db"
     return FileResponse(tmp_path, media_type="application/octet-stream", filename=filename)
 
 
@@ -139,7 +139,7 @@ def system_info(_user=Depends(get_current_user)):
         db_size_bytes = None
 
     return {
-        "version": os.environ.get("SIGNBOARD_VERSION", "0.1.0"),
+        "version": os.environ.get("EXHIBITOS_VERSION", "0.1.0"),
         "python_version": sys.version.split()[0],
         "fastapi_version": fastapi_version,
         "platform": f"{platform.system()} {platform.release()}",

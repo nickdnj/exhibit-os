@@ -1,9 +1,9 @@
 """Settings service — DB-backed config with env-var fallback.
 
-Pattern: services and APIs call `settings_service.get("tempest_api_token")`
+Pattern: services and APIs call `settings_service.get("tagsmart_api_key")`
 rather than reading from `config.get_settings()` directly. This means admins
 can change values in the UI and they take effect on the next read cycle
-(e.g., next weather poll) without a container restart.
+without a container restart.
 
 On first boot, `seed_defaults()` populates the DB from env vars so existing
 deployments keep working unchanged. Env vars remain the fallback if a key
@@ -19,23 +19,17 @@ from ..config import get_settings
 from ..database import get_session
 from ..models.setting import Setting
 
-logger = logging.getLogger("signboard.settings_service")
+logger = logging.getLogger("exhibitos.settings_service")
 
 
 # Registry: defines every setting the UI knows about.
 # (key, group, value_type, label, description, options, is_secret, is_readonly, sort_order)
 # value at runtime comes from DB → env fallback → registry default.
 SETTING_REGISTRY: list[dict] = [
-    # --- Weather ---
-    {"key": "tempest_station_id", "group": "weather", "value_type": "text",
-     "label": "Tempest Station ID", "description": "WeatherFlow device ID for current conditions",
-     "is_secret": False, "sort_order": 10},
-    {"key": "tempest_api_token", "group": "weather", "value_type": "password",
-     "label": "Tempest API Token", "description": "Cloud API credential for Tempest REST requests",
-     "is_secret": True, "sort_order": 20},
-    {"key": "timezone", "group": "weather", "value_type": "text",
-     "label": "Local Timezone", "description": "IANA name, e.g. America/New_York. Affects tide direction and schedule times.",
-     "is_secret": False, "sort_order": 30},
+    # --- Display & Localization ---
+    {"key": "timezone", "group": "display", "value_type": "text",
+     "label": "Local Timezone", "description": "IANA name, e.g. America/New_York. Affects scheduled times.",
+     "is_secret": False, "sort_order": 5},
 
     # --- Integrations ---
     {"key": "tagsmart_api_url", "group": "integrations", "value_type": "text",
@@ -54,32 +48,6 @@ SETTING_REGISTRY: list[dict] = [
      "label": "Transition Animation", "description": "Page transition style",
      "options": "fade,slide,none",
      "is_secret": False, "sort_order": 20},
-
-    # --- Lightning ---
-    {"key": "lightning_enabled", "group": "lightning", "value_type": "toggle",
-     "label": "Enable Lightning Monitor",
-     "description": "Interrupt pool channel with safety alert when strikes are detected",
-     "is_secret": False, "sort_order": 10},
-    {"key": "lightning_threshold_mi", "group": "lightning", "value_type": "number",
-     "label": "Alert Distance (miles)",
-     "description": "Strikes within this distance trigger the pool closed alert. Red Cross / NWS 30-30 rule standard is 6 miles.",
-     "is_secret": False, "sort_order": 20},
-    {"key": "lightning_countdown_minutes", "group": "lightning", "value_type": "number",
-     "label": "All-Clear Countdown (minutes)",
-     "description": "Minutes after last strike before rotation resumes (Red Cross / NWS 30/30 rule = 30)",
-     "is_secret": False, "sort_order": 30},
-    {"key": "lightning_tempest_url", "group": "lightning", "value_type": "text",
-     "label": "TempestWeather API URL",
-     "description": "Base URL for the TempestWeather strike API. Usually http://host.docker.internal:8036",
-     "is_secret": False, "sort_order": 40},
-    {"key": "lightning_poll_seconds", "group": "lightning", "value_type": "number",
-     "label": "Poll Interval (seconds)",
-     "description": "How often SignBoard polls TempestWeather for new strikes",
-     "is_secret": False, "sort_order": 50},
-    {"key": "lightning_alert_channels", "group": "lightning", "value_type": "text",
-     "label": "Alert Channels",
-     "description": "Comma-separated channel slugs to interrupt. Default: pool. Set to 'pool,office' to alert on both.",
-     "is_secret": False, "sort_order": 60},
 
     # --- System ---
     {"key": "log_level", "group": "system", "value_type": "dropdown",
@@ -100,19 +68,11 @@ SETTING_REGISTRY: list[dict] = [
 # Mapping: setting key → (config.py attribute name, default)
 # Used both for env-seeding and for get() fallback.
 ENV_FALLBACKS: dict[str, tuple[Optional[str], object]] = {
-    "tempest_station_id": ("tempest_station_id", "183092"),
-    "tempest_api_token": ("tempest_api_token", ""),
     "timezone": ("timezone", "America/New_York"),
     "tagsmart_api_url": ("tagsmart_api_url", "http://host.docker.internal:8080"),
     "tagsmart_api_key": ("tagsmart_api_key", ""),
     "default_rotation_interval": (None, 30),  # No env var — registry-only
     "transition_animation": (None, "fade"),
-    "lightning_enabled": (None, False),
-    "lightning_threshold_mi": (None, 6),
-    "lightning_countdown_minutes": (None, 30),
-    "lightning_tempest_url": (None, "http://host.docker.internal:8036"),
-    "lightning_poll_seconds": (None, 10),
-    "lightning_alert_channels": (None, "pool"),
     "log_level": ("log_level", "INFO"),
     "log_format": ("log_format", "json"),
     "cors_origin": ("cors_origin", "http://192.168.12.136:8100"),

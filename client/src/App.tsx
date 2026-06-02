@@ -17,7 +17,7 @@ function App() {
         <Route path="/admin" element={<AdminApp />} />
 
         {/* Default redirect */}
-        <Route path="/" element={<Navigate to="/display/office" replace />} />
+        <Route path="/" element={<Navigate to="/display/lobby" replace />} />
       </Routes>
     </BrowserRouter>
   );

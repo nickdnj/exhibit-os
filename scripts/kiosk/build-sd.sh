@@ -1,20 +1,20 @@
 #!/usr/bin/env bash
-# Flash a Raspberry Pi OS Lite image to an SD card and inject SignBoard
+# Flash a Raspberry Pi OS Lite image to an SD card and inject ExhibitOS
 # kiosk provisioning files so the Pi comes up headless with:
 #   - admin user (password + SSH key)
-#   - hostname from signboard.conf
+#   - hostname from exhibitos.conf
 #   - Comitup WiFi-AP-fallback provisioning
 #   - Chromium kiosk autostart pointing at KIOSK_URL
 #
 # Works on macOS. Requires: xz, diskutil, sudo.
 #
 # Usage:
-#   sudo bash build-sd.sh /dev/diskN path/to/raspios-lite.img.xz path/to/signboard.conf
+#   sudo bash build-sd.sh /dev/diskN path/to/raspios-lite.img.xz path/to/exhibitos.conf
 #
 # Example:
 #   sudo bash build-sd.sh /dev/disk4 \
-#       ~/Downloads/signboard-kiosk/raspios-lite.img.xz \
-#       ~/Workspaces/SignBoard/scripts/kiosk/configs/pool.conf
+#       ~/Downloads/exhibitos-kiosk/raspios-lite.img.xz \
+#       ~/Workspaces/exhibit-os/scripts/kiosk/configs/example.conf
 
 set -euo pipefail
 
@@ -26,7 +26,7 @@ die() { echo "ERROR: $*" >&2; exit 1; }
 
 [ -n "$DISK" ]  || die "Missing target disk (e.g. /dev/disk4)"
 [ -n "$IMAGE" ] || die "Missing image path (.img or .img.xz)"
-[ -n "$CONF" ]  || die "Missing signboard.conf path"
+[ -n "$CONF" ]  || die "Missing exhibitos.conf path"
 [ -b "$DISK" ] || [ -c "$DISK" ] || die "$DISK is not a block device"
 [ -f "$IMAGE" ] || die "$IMAGE not found"
 [ -f "$CONF" ]  || die "$CONF not found"
@@ -75,15 +75,15 @@ echo "Boot partition mounted at: $BOOT_MNT"
 # Inject provisioning files
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 
-echo "Writing signboard.conf..."
-cp "$CONF" "$BOOT_MNT/signboard.conf"
+echo "Writing exhibitos.conf..."
+cp "$CONF" "$BOOT_MNT/exhibitos.conf"
 
 echo "Writing authorized SSH key..."
-cp "$SSH_PUB" "$BOOT_MNT/signboard-authorized_keys"
+cp "$SSH_PUB" "$BOOT_MNT/exhibitos-authorized_keys"
 
 echo "Hashing admin password..."
 HASH=$(openssl passwd -6 "$ADMIN_PASSWORD")
-printf '%s' "$HASH" >"$BOOT_MNT/signboard-user-password"
+printf '%s' "$HASH" >"$BOOT_MNT/exhibitos-user-password"
 
 echo "Copying firstrun.sh..."
 cp "$SCRIPT_DIR/firstrun.sh" "$BOOT_MNT/firstrun.sh"
@@ -114,7 +114,7 @@ echo
 echo "=== DONE ==="
 echo "  1. Insert SD card into Pi Zero 2 W."
 echo "  2. Power on. First boot installs Comitup + kiosk (takes ~5 min)."
-echo "  3. If no WiFi detected, Pi will broadcast a 'signboard-setup-XXXX' hotspot."
+echo "  3. If no WiFi detected, Pi will broadcast an "exhibitos-setup-XXXX" hotspot."
 echo "     Connect from your phone, open http://10.41.0.1 or follow captive portal,"
 echo "     enter WiFi credentials, Pi reboots into kiosk mode."
 echo "  4. SSH access: ssh admin@<hostname>.local"

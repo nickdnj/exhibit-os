@@ -25,7 +25,7 @@ export default function PageManager() {
   const [editBody, setEditBody] = useState('');
   const [editPriority, setEditPriority] = useState('normal');
   const [saving, setSaving] = useState(false);
-  const token = localStorage.getItem('signboard_token');
+  const token = localStorage.getItem('exhibitos_token');
 
   useEffect(() => {
     loadPages();
@@ -129,9 +129,6 @@ export default function PageManager() {
 
   const pageTypeIcon = (type: string) => {
     switch (type) {
-      case 'weather_current': return '🌤';
-      case 'weather_hourly': return '⏱';
-      case 'weather_forecast': return '📊';
       case 'announcement': return '📢';
       default: return '📄';
     }

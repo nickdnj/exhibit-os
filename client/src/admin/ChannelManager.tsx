@@ -39,7 +39,7 @@ export default function ChannelManager() {
   const [saving, setSaving] = useState(false);
   const [showAddPicker, setShowAddPicker] = useState(false);
   const [allPages, setAllPages] = useState<AvailablePage[]>([]);
-  const token = localStorage.getItem('signboard_token');
+  const token = localStorage.getItem('exhibitos_token');
 
   useEffect(() => {
     loadChannels();
@@ -180,15 +180,7 @@ export default function ChannelManager() {
 
   const pageTypeIcon = (type: string) => {
     switch (type) {
-      case 'weather_current': return '🌤';
-      case 'weather_hourly': return '⏱';
-      case 'weather_forecast': return '📊';
       case 'announcement': return '📢';
-      case 'tide': return '🌊';
-      case 'tide_current': return '🌊';
-      case 'fishing_report': return '🎣';
-      case 'surf_report': return '🏄';
-      case 'lightning': return '⚡';
       default: return '📄';
     }
   };

@@ -6,10 +6,6 @@ router = APIRouter(tags=["health"])
 # Service status tracking (updated by background services)
 _service_status = {
     "database": {"status": "unknown", "last_check": None},
-    "tempest_weather": {"status": "unknown", "last_check": None, "last_data": None},
-    "noaa_tides": {"status": "unknown", "last_check": None, "last_data": None},
-    "surf": {"status": "unknown", "last_check": None, "last_data": None},
-    "lightning": {"status": "unknown", "last_check": None, "last_data": None},
 }
 
 

@@ -1,20 +1,15 @@
 import { useState, useEffect, useCallback } from 'react';
-import type { DisplayPage, WeatherCurrent } from '../api';
-import WeatherPage from './WeatherPage';
+import type { DisplayPage } from '../api';
 import AnnouncementPage from './AnnouncementPage';
-import TidePage from './TidePage';
-import FishingPage from './FishingPage';
-import SurfPage from './SurfPage';
 
 interface PageCarouselProps {
   pages: DisplayPage[];
   defaultDuration: number;
   channelName: string;
-  weatherData?: WeatherCurrent | null;
   wsConnected?: boolean;
 }
 
-export default function PageCarousel({ pages, defaultDuration, channelName, weatherData, wsConnected }: PageCarouselProps) {
+export default function PageCarousel({ pages, defaultDuration, channelName, wsConnected }: PageCarouselProps) {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [isTransitioning, setIsTransitioning] = useState(false);
   const [currentTime, setCurrentTime] = useState(new Date());
@@ -54,7 +49,7 @@ export default function PageCarousel({ pages, defaultDuration, channelName, weat
     return (
       <div className="h-screen w-screen flex items-center justify-center" style={{ backgroundColor: 'var(--brand-navy)' }}>
         <div className="text-center">
-          <p className="text-white text-[48px] font-bold">Wharfside Manor</p>
+          <p className="text-white text-[48px] font-bold">ExhibitOS</p>
           <p className="text-[28px] mt-4" style={{ color: 'var(--brand-gold)' }}>
             {channelName}
           </p>
@@ -70,8 +65,7 @@ export default function PageCarousel({ pages, defaultDuration, channelName, weat
       <div className="absolute top-0 left-0 right-0 h-16 flex items-center justify-between px-8 z-10"
         style={{ backgroundColor: 'var(--brand-navy-mid)' }}>
         <div className="flex items-center gap-4">
-          <span className="text-[28px] font-bold" style={{ color: 'var(--brand-gold)' }}>⚓</span>
-          <span className="text-white text-[24px] font-semibold tracking-wide">WHARFSIDE MANOR</span>
+          <span className="text-white text-[24px] font-semibold tracking-wide">{channelName.toUpperCase()}</span>
         </div>
         <div className="flex items-center gap-4">
           {/* Connection indicator */}
@@ -87,7 +81,7 @@ export default function PageCarousel({ pages, defaultDuration, channelName, weat
 
       {/* Page Content */}
       <div className={`absolute inset-0 pt-16 pb-12 transition-opacity duration-500 ${isTransitioning ? 'opacity-0' : 'opacity-100'}`}>
-        {renderPage(activePage, weatherData)}
+        {renderPage(activePage)}
       </div>
 
       {/* Footer */}
@@ -105,20 +99,8 @@ export default function PageCarousel({ pages, defaultDuration, channelName, weat
   );
 }
 
-function renderPage(page: DisplayPage, weatherData?: WeatherCurrent | null) {
+function renderPage(page: DisplayPage) {
   switch (page.page_type) {
-    case 'weather_current':
-      return <WeatherPage pushedData={weatherData} />;
-    case 'weather_hourly':
-      return <WeatherPage hourly />;
-    case 'weather_forecast':
-      return <WeatherPage forecast />;
-    case 'tide_current':
-      return <TidePage />;
-    case 'fishing_report':
-      return <FishingPage />;
-    case 'surf_report':
-      return <SurfPage />;
     case 'announcement':
       return <AnnouncementPage page={page} />;
     default:

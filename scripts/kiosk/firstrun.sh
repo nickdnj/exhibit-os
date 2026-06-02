@@ -1,5 +1,5 @@
 #!/bin/bash
-# SignBoard Pi first-boot provisioner.
+# ExhibitOS Pi first-boot provisioner.
 # Modeled on Raspberry Pi Imager's generated firstrun.sh, extended to install
 # a stage-2 systemd service that runs Comitup + kiosk install with network up.
 #
@@ -9,9 +9,9 @@
 #   systemd.unit=kernel-command-line.target
 #
 # Expects these files in /boot/firmware/:
-#   signboard.conf             — HOSTNAME, KIOSK_URL, HOME_WIFI_SSID, HOME_WIFI_PSK, etc.
-#   signboard-stage2.sh        — stage 2 installer (copied to /usr/local/sbin/)
-#   setup-kiosk.sh             — existing SignBoard kiosk installer
+#   exhibitos.conf             — HOSTNAME, KIOSK_URL, HOME_WIFI_SSID, HOME_WIFI_PSK, etc.
+#   exhibitos-stage2.sh        — stage 2 installer (copied to /usr/local/sbin/)
+#   setup-kiosk.sh             — existing ExhibitOS kiosk installer
 #
 # Log: /boot/firmware/firstrun.log
 
@@ -20,10 +20,10 @@ exec > >(tee /boot/firmware/firstrun.log) 2>&1
 echo "=== firstrun.sh started at $(date -u +%FT%TZ) ==="
 
 # ---- Load config -------------------------------------------------------------
-CONF=/boot/firmware/signboard.conf
+CONF=/boot/firmware/exhibitos.conf
 # shellcheck source=/dev/null
 [ -f "$CONF" ] && . "$CONF"
-: "${HOSTNAME:=signboard-kiosk}"
+: "${HOSTNAME:=exhibitos-kiosk}"
 : "${TIMEZONE:=America/New_York}"
 : "${KEYMAP:=us}"
 : "${WIFI_COUNTRY:=US}"
@@ -82,10 +82,10 @@ if [ -n "${HOME_WIFI_SSID:-}" ] && [ -n "${HOME_WIFI_PSK:-}" ]; then
     # Also drop an NM keyfile in case the helper above didn't handle NetworkManager
     NMDIR=/etc/NetworkManager/system-connections
     mkdir -p "$NMDIR"
-    NMFILE="$NMDIR/signboard-preseed.nmconnection"
+    NMFILE="$NMDIR/exhibitos-preseed.nmconnection"
     cat >"$NMFILE" <<EOF
 [connection]
-id=signboard-preseed
+id=exhibitos-preseed
 type=wifi
 autoconnect=true
 
@@ -111,7 +111,7 @@ EOF
     fi
     echo "  Preseeded SSID: $HOME_WIFI_SSID"
 else
-    echo "  No WiFi in signboard.conf — skipping preseed."
+    echo "  No WiFi in exhibitos.conf — skipping preseed."
 fi
 
 # ---- 5. Locale / timezone / keymap -------------------------------------------
@@ -127,25 +127,25 @@ fi
 
 # ---- 6. Install stage-2 systemd service --------------------------------------
 echo "[6] Installing stage-2 service..."
-if [ -f /boot/firmware/signboard-stage2.sh ]; then
-    cp /boot/firmware/signboard-stage2.sh /usr/local/sbin/signboard-stage2.sh
-    chmod +x /usr/local/sbin/signboard-stage2.sh
+if [ -f /boot/firmware/exhibitos-stage2.sh ]; then
+    cp /boot/firmware/exhibitos-stage2.sh /usr/local/sbin/exhibitos-stage2.sh
+    chmod +x /usr/local/sbin/exhibitos-stage2.sh
     cp /boot/firmware/setup-kiosk.sh /usr/local/sbin/setup-kiosk.sh 2>/dev/null || true
     chmod +x /usr/local/sbin/setup-kiosk.sh 2>/dev/null || true
-    cp /boot/firmware/signboard.conf /etc/signboard.conf 2>/dev/null || true
+    cp /boot/firmware/exhibitos.conf /etc/exhibitos.conf 2>/dev/null || true
 
-    cat >/etc/systemd/system/signboard-stage2.service <<'EOF'
+    cat >/etc/systemd/system/exhibitos-stage2.service <<'EOF'
 [Unit]
-Description=SignBoard stage-2 installer (apt + kiosk setup)
+Description=ExhibitOS stage-2 installer (apt + kiosk setup)
 After=network-online.target
 Wants=network-online.target
-ConditionPathExists=!/var/lib/signboard/stage2-done
+ConditionPathExists=!/var/lib/exhibitos/stage2-done
 
 [Service]
 Type=oneshot
-ExecStart=/usr/local/sbin/signboard-stage2.sh
-StandardOutput=append:/var/log/signboard-stage2.log
-StandardError=append:/var/log/signboard-stage2.log
+ExecStart=/usr/local/sbin/exhibitos-stage2.sh
+StandardOutput=append:/var/log/exhibitos-stage2.log
+StandardError=append:/var/log/exhibitos-stage2.log
 TimeoutStartSec=30min
 RemainAfterExit=yes
 
@@ -154,10 +154,10 @@ WantedBy=multi-user.target
 EOF
 
     mkdir -p /etc/systemd/system/multi-user.target.wants
-    ln -sf /etc/systemd/system/signboard-stage2.service \
-        /etc/systemd/system/multi-user.target.wants/signboard-stage2.service
+    ln -sf /etc/systemd/system/exhibitos-stage2.service \
+        /etc/systemd/system/multi-user.target.wants/exhibitos-stage2.service
 else
-    echo "  WARN: /boot/firmware/signboard-stage2.sh missing — skipping stage-2 install"
+    echo "  WARN: /boot/firmware/exhibitos-stage2.sh missing — skipping stage-2 install"
 fi
 
 # ---- 7. Self-clean cmdline + firstrun.sh -------------------------------------
