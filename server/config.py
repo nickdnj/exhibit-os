@@ -13,17 +13,13 @@ class Settings(BaseSettings):
     # Database
     database_url: str = "sqlite:///data/exhibitos.db"
 
-    # TagSmart
-    tagsmart_api_url: str = "http://host.docker.internal:8080"
-    tagsmart_api_key: str = ""
-
     # Display
     timezone: str = "America/New_York"
 
     # Server
     log_format: str = "json"
     log_level: str = "INFO"
-    cors_origin: str = "http://192.168.12.136:8100"
+    cors_origin: str = "http://localhost:8100"
     uploads_dir: str = "/data/uploads"
 
     model_config = {"env_file": ".env", "env_file_encoding": "utf-8"}

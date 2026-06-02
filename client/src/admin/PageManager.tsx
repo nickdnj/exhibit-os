@@ -158,7 +158,7 @@ export default function PageManager() {
                 value={newTitle}
                 onChange={(e) => setNewTitle(e.target.value)}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0B1F3A]"
-                placeholder="e.g., Pool Opens May 15"
+                placeholder="e.g., Now on Display: The Concurrent 3280"
                 maxLength={200}
                 autoFocus
               />

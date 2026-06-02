@@ -16,8 +16,6 @@ services:
       - UPLOADS_DIR=/data/uploads
       - JWT_SECRET_KEY=${JWT_SECRET_KEY}
       - DEFAULT_ADMIN_PASSWORD=${DEFAULT_ADMIN_PASSWORD:-exhibitos2026}
-      - TAGSMART_API_URL=${TAGSMART_API_URL:-http://host.docker.internal:8080}
-      - TAGSMART_API_KEY=${TAGSMART_API_KEY:-}
       - TIMEZONE=${TIMEZONE:-America/New_York}
       - LOG_FORMAT=${LOG_FORMAT:-json}
       - LOG_LEVEL=${LOG_LEVEL:-INFO}

@@ -1,6 +1,6 @@
 """Settings service — DB-backed config with env-var fallback.
 
-Pattern: services and APIs call `settings_service.get("tagsmart_api_key")`
+Pattern: services and APIs call `settings_service.get("timezone")`
 rather than reading from `config.get_settings()` directly. This means admins
 can change values in the UI and they take effect on the next read cycle
 without a container restart.
@@ -30,14 +30,6 @@ SETTING_REGISTRY: list[dict] = [
     {"key": "timezone", "group": "display", "value_type": "text",
      "label": "Local Timezone", "description": "IANA name, e.g. America/New_York. Affects scheduled times.",
      "is_secret": False, "sort_order": 5},
-
-    # --- Integrations ---
-    {"key": "tagsmart_api_url", "group": "integrations", "value_type": "text",
-     "label": "TagSmart API URL", "description": "Endpoint for fob → resident lookup",
-     "is_secret": False, "sort_order": 10},
-    {"key": "tagsmart_api_key", "group": "integrations", "value_type": "password",
-     "label": "TagSmart API Key", "description": "Read-only credentials for fob/slip queries",
-     "is_secret": True, "sort_order": 20},
 
     # --- Display ---
     {"key": "default_rotation_interval", "group": "display", "value_type": "number",
@@ -69,13 +61,11 @@ SETTING_REGISTRY: list[dict] = [
 # Used both for env-seeding and for get() fallback.
 ENV_FALLBACKS: dict[str, tuple[Optional[str], object]] = {
     "timezone": ("timezone", "America/New_York"),
-    "tagsmart_api_url": ("tagsmart_api_url", "http://host.docker.internal:8080"),
-    "tagsmart_api_key": ("tagsmart_api_key", ""),
     "default_rotation_interval": (None, 30),  # No env var — registry-only
     "transition_animation": (None, "fade"),
     "log_level": ("log_level", "INFO"),
     "log_format": ("log_format", "json"),
-    "cors_origin": ("cors_origin", "http://192.168.12.136:8100"),
+    "cors_origin": ("cors_origin", "http://localhost:8100"),
 }
 
 

@@ -96,12 +96,17 @@ export default function AdminDashboard() {
           <button className="px-4 py-2 bg-[#0B1F3A] text-white rounded-lg text-sm font-medium hover:bg-[#132B50] transition-colors">
             + New Announcement
           </button>
-          <button className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-50 transition-colors">
-            View Office Display
-          </button>
-          <button className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-50 transition-colors">
-            View Pool Display
-          </button>
+          {channels.map((ch) => (
+            <a
+              key={ch.id}
+              href={`/display/${ch.slug}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-50 transition-colors"
+            >
+              View {ch.name} Display
+            </a>
+          ))}
         </div>
       </div>
     </div>
