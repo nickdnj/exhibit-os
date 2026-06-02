@@ -96,11 +96,14 @@ volunteers, and developers alike.
 
 ## Lineage
 
-ExhibitOS is a clean-snapshot fork of **SignBoard**, a digital-signage system built for a
-different site (community kiosks on Raspberry Pi and streaming sticks, driven by a
-FastAPI + React + SQLite + WebSocket server). SignBoard is good at one thing —
-device-agnostic kiosk rendering and fleet control — and that is exactly the part ExhibitOS
-keeps, refactored for the museum domain and paired with Directus for content.
+ExhibitOS is the open information-display platform for the **Vintage Computer Federation
+Museum @ InfoAge Science Center**. It began as a clean-snapshot fork of **SignBoard** — a
+digital-signage system the author built and runs for a residential community on Raspberry Pi
+and ~$20 streaming sticks (FastAPI + React + SQLite + WebSocket). SignBoard is good at one
+thing — device-agnostic kiosk rendering and fleet control — and that is exactly the part
+ExhibitOS keeps. Everything community-specific (tide, surf, and weather boards, marina
+notices) is stripped out and replaced with the museum domain — exhibits, rooms, artifacts,
+people, and interpretive cards — paired with Directus for content.
 
 ## License
 

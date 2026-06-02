@@ -218,12 +218,3 @@ def get_int(key: str, default: int = 0) -> int:
 
 def get_bool(key: str, default: bool = False) -> bool:
     return settings_service.get_bool(key, default)
-
-
-def _get_timezone() -> Optional["ZoneInfo"]:  # type: ignore[name-defined]
-    """Convenience: return a ZoneInfo for the configured timezone, or None."""
-    try:
-        from zoneinfo import ZoneInfo
-        return ZoneInfo(get("timezone") or "America/New_York")
-    except Exception:
-        return None
