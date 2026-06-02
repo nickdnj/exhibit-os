@@ -56,6 +56,24 @@ stack runs in **Docker on a single mini PC**; the screens themselves are cheap �
 streaming sticks, Raspberry Pis, or repurposed legacy PCs. Software cost is effectively
 zero; it's MIT-licensed end to end.
 
+## Run it locally
+
+No Docker required for a quick look:
+
+```bash
+./scripts/run-local.sh
+```
+
+First run sets up a Python venv, installs dependencies, and builds the client; then it serves
+everything on one port. Open:
+
+- **Kiosk display:** http://localhost:8100/display/lobby
+- **Admin:** http://localhost:8100/admin (default user `admin`, password `exhibitos2026` — you'll be
+  asked to change it on first login)
+
+Authored content persists in `./data/` between runs. For a containerized deployment, use
+`docker compose up` instead.
+
 ## Status
 
 🟡 **Bootstrapping.** The thinking is done and documented; the build is underway.
