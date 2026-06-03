@@ -47,8 +47,9 @@ def _exhibit_full(e: Exhibit) -> dict:
 
 @router.get("")
 def list_exhibits(db: Session = Depends(get_db)):
-    """PUBLIC — displays need this. Lightweight list of all exhibits."""
-    exhibits = db.query(Exhibit).order_by(Exhibit.title).all()
+    """PUBLIC — displays need this. Lightweight list of all exhibits,
+    in the docent wiki's approximate-chronological source order."""
+    exhibits = db.query(Exhibit).order_by(Exhibit.sort_order, Exhibit.title).all()
     return [_exhibit_summary(e) for e in exhibits]
 
 

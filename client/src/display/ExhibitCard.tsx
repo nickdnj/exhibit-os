@@ -22,8 +22,9 @@ type State =
   | { status: 'error' }
   | { status: 'ready'; exhibit: Exhibit };
 
-export default function ExhibitCard() {
-  const { slug } = useParams<{ slug: string }>();
+export default function ExhibitCard({ slug: slugProp }: { slug?: string } = {}) {
+  const params = useParams<{ slug: string }>();
+  const slug = slugProp ?? params.slug;
   const [state, setState] = useState<State>({ status: 'loading' });
 
   useEffect(() => {

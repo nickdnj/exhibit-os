@@ -19,6 +19,8 @@ class Exhibit(Base):
     slug: Mapped[str] = mapped_column(String(200), unique=True, index=True)
     title: Mapped[str] = mapped_column(String(300))
     year_introduced: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    # Source position in the docent wiki (approx. chronological) — drives display order.
+    sort_order: Mapped[int] = mapped_column(Integer, default=0, index=True)
 
     # Wiki-sourced narrative content (refreshed on re-ingest when content changes)
     body_text: Mapped[str] = mapped_column(Text, default="")

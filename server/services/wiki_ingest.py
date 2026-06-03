@@ -94,10 +94,19 @@ def _split_exhibits(text: str) -> list[tuple[str, list[str]]]:
 
 
 def _extract_year(body_text: str, title: str) -> int | None:
-    """Earliest in-range 4-digit year in the body, else in the title."""
+    """Earliest plausible computing-era year in the body, else in the title.
+
+    Floor is 1900: pre-1900 "years" in this collection are almost always model
+    numbers (Commodore 1660 modem, 1701 monitor, RCA CDP1801 chip) rather than
+    real introduction dates, so we ignore them. The handful of genuinely ancient
+    items (abacus, slide rule) simply show no dateline, which is fine — their
+    era is clear from the text. Display ordering does not rely on this value.
+    """
+    floor = max(_YEAR_MIN, 1900)
+
     def earliest_in_range(s: str) -> int | None:
         years = [int(y) for y in _YEAR_RE.findall(s)]
-        years = [y for y in years if _YEAR_MIN <= y <= _YEAR_MAX]
+        years = [y for y in years if floor <= y <= _YEAR_MAX]
         return min(years) if years else None
 
     return earliest_in_range(body_text) or earliest_in_range(title)
@@ -148,6 +157,7 @@ def parse_dokuwiki(text: str) -> list[dict]:
     """
     results: list[dict] = []
     seen_slugs: dict[str, int] = {}
+    order = 0
     for title, body_lines in _split_exhibits(text):
         if not title:
             continue
@@ -170,8 +180,12 @@ def parse_dokuwiki(text: str) -> list[dict]:
                 "year": year,
                 "related": None,  # related-exhibit links are ExhibitOS-managed (ADR-0001)
                 "source_ref": f"the_artifacts#{slug}",
+                # Source position — the_artifacts is in approximate chronological
+                # order, so this drives the display tour (more reliable than parsed year).
+                "sort_order": order,
             }
         )
+        order += 1
     return results
 
 
@@ -226,6 +240,7 @@ def ingest_from_file(path: str | None = None) -> dict:
                         source_ref=parsed["source_ref"],
                         content_hash=content_hash,
                         ingested_at=now,
+                        sort_order=parsed["sort_order"],
                     )
                 )
                 created += 1
@@ -240,8 +255,11 @@ def ingest_from_file(path: str | None = None) -> dict:
                 existing.source_ref = parsed["source_ref"]
                 existing.content_hash = content_hash
                 existing.ingested_at = now
+                existing.sort_order = parsed["sort_order"]
                 updated += 1
             else:
+                # Keep source position current even when narrative is unchanged.
+                existing.sort_order = parsed["sort_order"]
                 unchanged += 1
 
         db.commit()
