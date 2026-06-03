@@ -1,5 +1,25 @@
 const BASE_URL = '/api';
 
+/**
+ * Fetch JSON from an authenticated endpoint. On 401 (expired/invalid token),
+ * clears the stored token and redirects to the login page instead of letting
+ * the app crash on a parsed error body. Throws on any non-OK response.
+ */
+export async function authedGet<T>(path: string, token: string | null): Promise<T> {
+  const resp = await fetch(path, {
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+  });
+  if (resp.status === 401) {
+    localStorage.removeItem('exhibitos_token');
+    if (!window.location.pathname.endsWith('/admin/login')) {
+      window.location.href = '/admin/login';
+    }
+    throw new Error('Unauthorized');
+  }
+  if (!resp.ok) throw new Error(`Request to ${path} failed: ${resp.status}`);
+  return resp.json();
+}
+
 export interface ChannelDisplay {
   channel: {
     name: string;

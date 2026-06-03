@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { authedGet } from '../api';
 
 interface ChannelStatus {
   id: number;
@@ -20,11 +21,8 @@ export default function AdminDashboard() {
   const token = localStorage.getItem('exhibitos_token');
 
   useEffect(() => {
-    const headers = { Authorization: `Bearer ${token}` };
-
-    fetch('/api/channels', { headers })
-      .then((r) => r.json())
-      .then(setChannels)
+    authedGet<ChannelStatus[]>('/api/channels', token)
+      .then((d) => setChannels(Array.isArray(d) ? d : []))
       .catch(() => {});
 
     fetch('/health')

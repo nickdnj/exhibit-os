@@ -29,7 +29,8 @@ export default function ExhibitManager() {
     try {
       const resp = await fetch('/api/exhibits');
       if (!resp.ok) throw new Error('Failed to load exhibits');
-      setExhibits(await resp.json());
+      const data = await resp.json();
+      setExhibits(Array.isArray(data) ? data : []);
       setError(null);
     } catch {
       setError('Could not load exhibits.');

@@ -119,7 +119,12 @@ def _parse_body(body_lines: list[str]) -> tuple[str, list[str]]:
             if fact:
                 facts.append(fact)
             continue
-        narrative.append(_clean_inline(raw).rstrip())
+        cleaned = _clean_inline(raw).rstrip()
+        # Drop DokuWiki horizontal rules (e.g. "----", "-----") — separators, not content.
+        stripped = cleaned.strip()
+        if len(stripped) >= 3 and set(stripped) == {"-"}:
+            continue
+        narrative.append(cleaned)
 
     # Collapse runs of blank lines and trim.
     text_lines: list[str] = []
