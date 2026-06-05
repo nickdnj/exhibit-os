@@ -1,13 +1,11 @@
 # Product Requirements Document: ExhibitOS
 
-> ⚠️ **Content-source decision superseded (2026-06-02).** This PRD names Directus as the system of
-> record (§9a and the principles in §1–2). That was reversed: the museum's existing **docent wiki**
-> is the content source of truth and ExhibitOS **ingests** from it; Directus is deferred. See
-> [`decisions/0001-content-source.md`](decisions/0001-content-source.md). The four deliverable forms,
-> personas, and scope are otherwise unchanged.
+> **Content architecture:** the docent wiki is the source of truth — see
+> [`decisions/0001-content-source.md`](decisions/0001-content-source.md) (a CMS was explored and
+> passed on).
 
-**Version:** 0.1 (first draft)
-**Last Updated:** 2026-05-31
+**Version:** 0.4
+**Last Updated:** 2026-06-05
 **Author:** Nick DeMarco, with AI assistance
 **Status:** Draft
 **Repo:** github.com/nickdnj/exhibit-os · local `~/Workspaces/exhibit-os`
@@ -64,11 +62,15 @@ streaming sticks, driven by a FastAPI + React + SQLite + WebSocket server). Sign
 good at one thing: **device-agnostic kiosk rendering and fleet control.** That is exactly
 the part ExhibitOS keeps.
 
-The bet that defines this PRD: **content management is a solved problem, and we should
-not solve it again.** Rather than grow SignBoard's SQLite schema into a homegrown CMS
-(roles, revisions, approval workflows, a media library — all the things that take years
-to get right), ExhibitOS adopts **Directus** as its content backbone and demotes the
-SignBoard core to a **thin renderer + fleet layer** that consumes the Directus API.
+The bet that defines this PRD: **content management is already solved — by the museum's own
+docent wiki — and we should not solve it again.** The VCF docents author placard text in their
+existing **DokuWiki** today, which already gives them revision history, diffs, attribution, and
+revert. Rather than grow SignBoard's SQLite schema into a homegrown CMS, *or* stand up a separate
+CMS that would duplicate the wiki's version control, ExhibitOS **ingests** the wiki into a local
+read-cache and renders it. The SignBoard core becomes a **thin ingest + renderer + fleet layer**.
+A self-hosted CMS was explored and passed on; see
+[`decisions/0001-content-source.md`](decisions/0001-content-source.md), which links to the
+explored-option primer.
 
 ---
 
@@ -76,28 +78,33 @@ SignBoard core to a **thin renderer + fleet layer** that consumes the Directus A
 
 ### 2.1 Goals (v1)
 
-1. **Model once, render many.** A single Directus "Asset" record drives all four v1
-   deliverable forms. No content is duplicated per form.
-2. **Directus is the system of record.** All content — text, media, credits, relations,
-   draft/published state, revision history — lives in Directus. ExhibitOS stores only
-   *display-assignment config* (which device shows which asset, schedules, overlays).
-3. **Ship the Concurrent 3280 end-to-end.** One real exhibit, authored in Directus,
+1. **Author once, render many.** A single exhibit — authored in the docent wiki, ingested into
+   one ExhibitOS `Exhibit` record — drives all four v1 deliverable forms. No content is
+   duplicated per form.
+2. **The docent wiki is the system of record.** All narrative content — title, interpretive
+   text, key facts, people, relationships — and its revision history live in the **wiki**, where
+   docents already author. ExhibitOS holds a **read-cache** of that content plus the things the
+   wiki doesn't own: display assignment, schedules, the fleet, and deliverable assets (hero image,
+   looping video, deep-content URL, location).
+3. **Ship the Concurrent 3280 end-to-end.** One real exhibit, authored in the wiki and ingested,
    rendered as an on-screen card + printable sign + video display + touchscreen
    interactive, on one or two real displays at InfoAge, controlled from the dashboard.
 4. **Match InfoAge's existing visual style.** Printable cards must visually belong
    alongside InfoAge's ~9 existing physical signs (ENIAC / UNIVAC / Wang house style).
-5. **Transfer operational ownership.** A non-technical museum volunteer can add an
-   exhibit, edit a card, and assign it to a display with **zero developer involvement.**
-   This is a first-class product requirement (§8), not a nice-to-have.
+5. **Transfer operational ownership.** A non-technical museum volunteer can author an
+   exhibit (in the wiki they already use), then assign it to a display with **zero developer
+   involvement.** This is a first-class product requirement (§8), not a nice-to-have.
 6. **Free / open / cheap.** Docker on a mini PC; kiosks on Pi Zero 2 W (~$15) and Onn FHD
-   streaming sticks (~$20); MIT licensed; Directus on its free self-hosted tier.
-7. **Tell cross-reference stories.** The data model must make "related exhibit" a
-   first-class relation (the 3280 → SGI Onyx 10000 closed loop is the proof case).
+   streaming sticks (~$20); MIT licensed; content stays in the wiki the museum already runs.
+7. **Tell cross-reference stories.** The model must make "related exhibit" first-class
+   (the 3280 → SGI Onyx 10000 closed loop is the proof case).
 
 ### 2.2 Non-Goals (explicitly out of scope for v1)
 
-- **Re-implementing a CMS inside SignBoard.** Directus owns content. SignBoard's tables
-  do not store interpretive copy, media, or credits after migration.
+- **Building (or running) a CMS.** ExhibitOS does not implement its own content editor,
+  draft/approval workflow, or revision system, and does not run a separate CMS — the docent
+  wiki provides authoring and version control. ExhibitOS's tables hold a read-cache of wiki
+  content plus its own display-side fields, never the authoritative narrative.
 - **Multi-museum tenancy / hosted SaaS.** v1 is a single-instance, single-museum
   install. Multi-museum support is a later phase (§7).
 - **Ticketing, membership, POS, visitor analytics dashboards.** ExhibitOS displays
@@ -115,27 +122,29 @@ SignBoard core to a **thin renderer + fleet layer** that consumes the Directus A
 
 ### 3.1 Persona A — Curator / Volunteer Author ("Doug")
 
-A knowledgeable, non-technical museum volunteer. Comfortable with web forms and Google
-Docs; not comfortable with SSH, JSON, or "deploying." Wants to write the story of an
-artifact and see it appear on the screens and in print. **This persona's success defines
+A knowledgeable, non-technical museum volunteer. Comfortable with web forms and the docent
+wiki he already uses; not comfortable with SSH, JSON, or "deploying." Wants to write the story
+of an artifact and see it appear on the screens and in print. **This persona's success defines
 the product** (see §8, "we build, we don't run").
 
 **Journey — Author a new exhibit:**
-1. Logs into Directus (museum-branded URL, his own login).
-2. Creates a new **Asset** record: title, subtitle, hero photo (uploaded to the media
-   library with caption + source + credit), interpretive body, bullet facts, a QR target.
-3. Links the asset to a **Room**, to a **Person** (the inventor), to **MediaItems**, and
-   optionally to a **related Asset** ("see also: SGI Onyx 10000").
-4. Sets status to **Draft**, saves. A reviewer approves → status **Published**.
-5. Opens the ExhibitOS dashboard, assigns the published asset to the room's display,
-   picks the deliverable form (card / video / interactive). Done — no developer touched it.
+1. Opens the **docent wiki** (the same DokuWiki he already writes placard text in) and edits
+   the artifact's page: title, interpretive text, key facts, people, year. The wiki tracks the
+   revision automatically.
+2. In ExhibitOS, an admin (or a scheduled job) **re-ingests** the wiki so the new/edited page
+   appears as an `Exhibit` in the read-cache. (v1: an admin clicks **Re-ingest** in the
+   dashboard or runs the CLI; later: scheduled/live ingest.)
+3. Doug opens the ExhibitOS dashboard and attaches the display-side fields the wiki doesn't
+   hold — hero image, looping video, deep-content URL, location — and assigns the exhibit to
+   the room's display, picking the deliverable form (card / video / interactive). Done — no
+   developer touched it.
 
-**Journey — Fix a typo:** Doug opens the asset in Directus, edits one field, saves. Every
-surface showing that asset updates on next refresh. Directus keeps the revision history.
+**Journey — Fix a typo:** Doug edits the artifact's page **in the wiki** and saves; the wiki
+keeps the revision history. On the next ingest, every surface showing that exhibit updates.
 
-**Journey — Print a sign:** Doug opens the asset, clicks **Export printable card** in the
-dashboard, downloads a print-ready PDF matching InfoAge's house style, sends it to the
-museum's sign printer.
+**Journey — Print a sign:** Doug opens the exhibit in the dashboard, clicks **Export printable
+card**, downloads a print-ready PDF matching InfoAge's house style, sends it to the museum's
+sign printer.
 
 ### 3.2 Persona B — Visitor ("Maria")
 
@@ -150,10 +159,10 @@ the photo gallery and the "related exhibit" link to the Onyx 10000.
 
 ### 3.3 Persona C — System Admin ("Nick" / future volunteer admin)
 
-Sets up the mini PC and Directus, provisions kiosks, manages the device fleet, and is
-the *only* persona allowed to touch infrastructure. The goal is to make this persona
-**optional after install** — the curator persona handles day-to-day content and
-assignment without escalating to admin.
+Sets up the mini PC, configures the wiki-ingest connection, provisions kiosks, manages the
+device fleet, and is the *only* persona allowed to touch infrastructure. The goal is to make
+this persona **optional after install** — the curator persona handles day-to-day content (in
+the wiki) and display assignment without escalating to admin.
 
 **Journey — Provision a display:** Flash a Pi Zero 2 W (or set up an Onn stick with Fully
 Kiosk), point it at the ExhibitOS display URL for its room, register it in the dashboard's
@@ -167,51 +176,59 @@ the dashboard or SSHing anywhere.
 
 ## 4. System Architecture
 
-### 4.1 The two systems and their contract
+### 4.1 The split and the contract
 
-ExhibitOS is **two cooperating systems** with a clean boundary:
+ExhibitOS has a clean boundary between **where content is authored** and **where it is
+displayed**:
 
-- **Directus — the System of Record (SoR).** Owns ALL content and the authoring
-  experience. Self-hosted Docker container, free tier (no feature paywall for orgs under
-  $5M revenue). Provides roles, revision history, approval/review flows, a media library,
-  and both REST and GraphQL APIs out of the box.
-- **ExhibitOS (the SignBoard core, refactored) — Renderers + Fleet.** A FastAPI + React +
-  SQLite + WebSocket app on the mini PC. It **consumes** the Directus API, renders content
-  to devices by device class, exports printable cards, pushes content to the fleet, and
-  manages overlays/schedules. It stores **no content** — only display-assignment config.
+- **The docent wiki (DokuWiki) — the System of Record.** Owns ALL narrative content (title,
+  interpretive text, key facts, people, year, relationships) and its revision history. The
+  docents author and edit there, as they do today; the wiki provides accounts, diffs,
+  attribution, and revert. ExhibitOS does **not** author narrative content.
+- **ExhibitOS (the SignBoard core, refactored) — Ingest + Renderers + Fleet.** A FastAPI +
+  React + SQLite + WebSocket app on the mini PC. It **ingests** the wiki (a DokuWiki export
+  file today; the live DokuWiki API later) into a local **`Exhibit` read-cache**, renders
+  content to devices by device class, exports printable cards, pushes content to the fleet,
+  and manages overlays/schedules. It owns only the things the wiki doesn't: **display
+  assignment, schedules, the fleet, and deliverable assets** (hero image, looping video,
+  deep-content URL, location).
 
-The contract: **Directus is the only place content is created or edited. ExhibitOS is the
-only place displays are configured and controlled.** They never overlap.
+The contract: **the wiki is the only place narrative content is authored; ExhibitOS is the
+only place displays are configured and controlled.** ExhibitOS's copy of the narrative is a
+read-cache, refreshed by re-ingest; its display-side fields are its own.
 
 ### 4.2 Data-flow diagram (in text)
 
 ```
    ┌──────────────────────────────────────────────────────────────────┐
-   │  AUTHORING (Curator / Volunteer)                                   │
+   │  AUTHORING (Docents — in the wiki they already use)                │
    │                                                                    │
-   │   Directus Admin UI  ──writes──▶  Directus (System of Record)      │
-   │   (roles, drafts,                  ├─ Asset / Exhibit              │
-   │    review/approve,                 ├─ Room / Location              │
-   │    media library,                  ├─ Person                      │
-   │    revision history)               ├─ MediaItem (caption/src/credit)│
-   │                                    └─ relations (asset↔room↔person↔│
-   │                                        media↔related-asset)        │
+   │   DokuWiki  ──authored by docents──▶  exhibit pages                │
+   │   (accounts, page revisions,          title · interpretive text · │
+   │    diffs, attribution, revert)        key facts · people · year   │
+   │                                                                    │
+   │                                                                    │
+   │                                                                    │
+   │                                                                    │
    └───────────────────────────────┬────────────────────────────────────┘
-                                    │  REST / GraphQL  (read-only token)
+                  ingest: DokuWiki export file (today)  / live API (later)
                                     ▼
    ┌──────────────────────────────────────────────────────────────────┐
-   │  EXHIBITOS SERVER (mini PC, Docker)  — RENDERERS + FLEET            │
+   │  EXHIBITOS SERVER (mini PC, Docker)  — INGEST · RENDER · FLEET      │
    │                                                                    │
-   │   Directus Sync ──▶ local cache (SQLite + media mirror)            │
+   │   wiki_ingest ──▶ Exhibit read-cache (SQLite) + media on disk      │
+   │      (idempotent upsert by slug via content_hash; preserves        │
+   │       ExhibitOS-owned display fields; source order = display order)│
    │        │                                                           │
    │        ▼                                                           │
    │   Display-assignment config (SQLite — repurposed SignBoard tables):│
-   │        which Device shows which Asset, in which Form, on what      │
+   │        which Device shows which Exhibit, in which Form, on what    │
    │        schedule, with what overlays (scheduled / emergency)        │
    │        │                                                           │
    │        ├─ Renderer: Interpretive Card + QR   (+ printable export)  │
    │        ├─ Renderer: Video Information Display                      │
    │        ├─ Renderer: Touchscreen Interactive  (touch class only)    │
+   │        ├─ Public "show" (auto-rotating collection) at /show        │
    │        └─ Dashboard: assign content, schedule, overlay, FLEET ctl  │
    └───────────┬───────────────────────────────────┬────────────────────┘
        WebSocket push (Pi)              REST pull bridge (Fully Kiosk)
@@ -234,22 +251,29 @@ fleet push, overlay/scheduling, kiosk rendering). The refactor:
 
 | SignBoard concept (today) | Becomes in ExhibitOS | Notes |
 |---|---|---|
-| **Page** (held content body) | **Display assignment** — a pointer to a Directus Asset ID + chosen Form + render options | Content body fields are **emptied**; content now lives in Directus. |
-| **Channel** (a named feed a kiosk subscribes to) | **Room/Display feed** — the playlist of assigned assets for a device in a room | Keeps the subscribe-by-slug model (`/display/<room>`). |
-| **SQLite content columns** | **Local read cache** of Directus content for offline resilience (§9) | Cache, not source of truth. Authoritative copy is always Directus. |
+| **Page** (held content body) | **Display assignment** — a pointer to an `Exhibit` (by slug/id) + chosen Form + render options | Content body fields are **emptied**; narrative now comes from the wiki via ingest. |
+| **Channel** (a named feed a kiosk subscribes to) | **Room/Display feed** — the playlist of assigned exhibits for a device in a room | Keeps the subscribe-by-slug model (`/display/<room>`). |
+| **SQLite content columns** | the **`Exhibit` read-cache** of ingested wiki content (§9) | Cache, not source of truth. The authoritative narrative is always the wiki. |
 | **Overlay / schedule tables** | **Unchanged** — scheduled + emergency overlays | This is SignBoard's strength; carried forward as-is. |
-| **`kiosks` table + agent protocol** | **Fleet table + device class** | Extended with `device_class` (passive / touchscreen) and `platform` (pi / fully-kiosk). |
-| **JWT admin auth** | **Dashboard admin auth** | Reused for fleet + assignment control. |
+| **`kiosks` table + agent protocol** | **Fleet table + device class** | Extended with `device_class` (passive / touchscreen) and `platform` (chromium-kiosk / fully-kiosk). |
+| **JWT admin auth** | **Dashboard admin auth** | Reused for fleet + assignment control + the authed re-ingest trigger. |
 
-### 4.4 Content migration (out of SignBoard tables, into Directus)
+### 4.4 The Exhibit read-cache and ingest (what is built)
 
-For v1 there is no legacy museum content to migrate (the 3280 is authored fresh in
-Directus). The **engineering migration** is structural: a one-time refactor that
-(a) creates the Directus collections (§5), (b) strips content fields from the
-Page/Channel tables leaving only assignment pointers, and (c) adds the Directus Sync
-service + local cache. Any sample/demo content currently in the SignBoard SQLite store is
-**deleted, not migrated** — the platform must never fall back to demo data (show error
-states instead; see §6/§9).
+There is no legacy museum content to migrate — exhibit narrative is authored in the wiki and
+**ingested** into the `Exhibit` read-cache. The ingest path is built (see ARCHITECTURE.md §5):
+
+- `server/services/wiki_ingest.py` parses a DokuWiki export, derives a url-safe `slug` per
+  exhibit, and **idempotently upserts** by slug — refreshing the wiki-sourced fields only when
+  the parsed `content_hash` changes, and **never overwriting** the ExhibitOS-owned display
+  fields (`hero_image`, `video_url`, `deep_content_url`, `location`).
+- Source order in the export drives `sort_order`, which drives display order.
+- Re-ingest is triggered by the authed `POST /api/exhibits/ingest` (dashboard **Re-ingest**
+  button), the `python -m scripts.ingest_wiki` CLI, or — later — a schedule / the live
+  DokuWiki API through the same parser.
+
+Any sample/demo content from the SignBoard SQLite store is **deleted, not migrated** — the
+platform must never fall back to demo data (show error states instead; see §6/§9).
 
 ### 4.5 Reused SignBoard fleet patterns (cited)
 
@@ -257,7 +281,7 @@ ExhibitOS inherits SignBoard's two-protocol fleet model verbatim
 (`signboard-fleet-management-spec.md`, `signboard-google-tv-spec.md`):
 
 - **Pi Zero 2 W → WebSocket push.** A small persistent `exhibit-agent` (the SignBoard
-  agent, renamed) connects to `WS /ws/kiosk-agent`, sends a 10s heartbeat
+  agent, renamed) connects to `WS /ws/device-agent`, sends a 10s heartbeat
   (`hostname, ip, version, uptime, mem_free, load_avg`), and handles `reboot`,
   `reload`, `update-scripts`. Server keeps an in-memory `dict[hostname → WebSocket]`.
 - **Onn FHD stick / Google TV → Fully Kiosk REST pull.** No agent on-device; the
@@ -272,116 +296,63 @@ ExhibitOS inherits SignBoard's two-protocol fleet model verbatim
 
 ---
 
-## 5. Directus Content Model
+## 5. Content Model — the `Exhibit` read-cache
 
-All collections live in Directus. Types below are Directus field types. Every collection
-has implicit `id`, `status` (where noted), `date_created`, `date_updated`, `user_created`,
-`user_updated` (Directus standard). Draft/Published gating uses the `status` field.
+Narrative content is authored in the docent wiki. ExhibitOS holds it in a single SQLite
+read-cache model, `Exhibit`, populated by wiki ingest. There is **no CMS and no separate
+collections** for rooms/people/media as content tables — those are either ExhibitOS-managed
+display fields or future wiki-sourced fields, not a content database. (This model is built —
+`server/models/exhibit.py`.)
 
-### 5.1 Collection: `asset` (Asset / Exhibit)
+### 5.1 The `Exhibit` model
 
-A physical display piece; the central record. Owns content reusable across all forms.
+One row per exhibit, keyed by a url-safe `slug` derived from the title. Fields split into
+**wiki-sourced** (refreshed on re-ingest when `content_hash` changes) and **ExhibitOS-owned**
+(set in the dashboard, **never** overwritten by re-ingest).
 
-| Field | Type | Notes |
-|---|---|---|
-| `title` | string (required) | e.g. "The Concurrent 3280" |
-| `subtitle` | string | e.g. "The last great pre-RISC scalar minicomputer" |
-| `slug` | string (unique) | URL-safe id, e.g. `concurrent-3280` |
-| `status` | string (draft / in_review / published / archived) | drives publish gating + approval flow |
-| `hero_image` | M2O → `media_item` | primary photo for card/interactive |
-| `interpretive_body` | text (rich/markdown) | the main narrative |
-| `bullet_facts` | JSON (array of strings) | the bullet list (matches sign "Bullets") |
-| `backstory` | text (rich/markdown) | the "Backstory" sub-section |
-| `closer` | text | the closer / easter-egg strip line |
-| `qr_target_url` | string (URL) | where the QR resolves (deep content) |
-| `deep_content_url` | string (URL) | wiki entry / canonical deep page |
-| `youtube_url` | string (URL) | YouTube for the phone/QR **deep-content page only** — NOT played on kiosks (on-floor video is self-hosted HTML5; 2026-06-01 policy) |
-| `card_template` | string (enum: `infoage-house` / others) | which printable style to match |
-| `featured` | boolean | for dashboard sorting |
+| Field | Type | Origin | Notes |
+|---|---|---|---|
+| `id` | int (PK) | system | autoincrement |
+| `slug` | string (unique) | derived | url-safe id from the title, e.g. `concurrent-3280` |
+| `title` | string | **wiki** | e.g. "The Concurrent 3280" |
+| `year_introduced` | int (nullable) | **wiki** | parsed from the body/title where present |
+| `sort_order` | int (indexed) | **wiki** | source position in the export → drives display order |
+| `body_text` | text | **wiki** | interpretive narrative |
+| `key_facts` | text | **wiki** | newline-joined bullet facts |
+| `people` | string (nullable) | **wiki** | people associated with the exhibit (when present in the source) |
+| `related_exhibits` | text (nullable) | **wiki/ExhibitOS** | cross-reference links (the 3280 ↔ Onyx 10000 case) — managed by ExhibitOS until the wiki carries them |
+| `source_ref` | string | derived | provenance, e.g. `the_artifacts#<slug>` |
+| `content_hash` | string | derived | hash of the parsed wiki content; idempotency key for re-ingest |
+| `ingested_at` | datetime | derived | last ingest timestamp |
+| `hero_image` | string (nullable) | **ExhibitOS** | deliverable asset — preserved across re-ingest |
+| `video_url` | string (nullable) | **ExhibitOS** | self-hosted looping video — preserved across re-ingest |
+| `deep_content_url` | string (nullable) | **ExhibitOS** | QR/phone deep-dive target — preserved across re-ingest |
+| `location` | string (nullable) | **ExhibitOS** | physical location / room reference — preserved across re-ingest |
 
-**Relations:**
-- `room` — M2O → `room` (where the asset physically lives)
-- `people` — M2M → `person` (inventors / architects / curators)
-- `media` — M2M → `media_item` (gallery, ordered via junction `sort`)
-- `related_assets` — M2M self-referential → `asset` (cross-reference; the 3280 ↔ Onyx
-  10000 case). Junction may carry a `relationship_note` string ("same architect, 30 ft away").
+### 5.2 Rooms, people, related links, and media
 
-### 5.2 Collection: `room` (Room / Location)
+- **Rooms / display feeds** are an ExhibitOS concept used for fleet routing (`/display/<room>`)
+  and assignment — not a content collection. Authors think "this exhibit shows in the Main
+  Gallery"; the dashboard maps rooms → devices.
+- **People** arrive as a wiki-sourced field on `Exhibit` when the source provides them; richer
+  structured person records are a future enhancement, not a v1 content table.
+- **Related-exhibit links** are ExhibitOS-managed (the `related_exhibits` field), keyed to the
+  exhibit slug, until/unless the wiki carries them as structured links.
+- **Deliverable media** (hero image, looping video) are ExhibitOS-owned display fields, set in
+  the dashboard and preserved across re-ingest. The wiki remains the source for narrative text;
+  ExhibitOS owns the on-floor assets the wiki doesn't naturally hold.
 
-A first-class place with display device(s), hours, and assigned content.
+### 5.3 Idempotent ingest (built)
 
-| Field | Type | Notes |
-|---|---|---|
-| `name` | string (required) | e.g. "VCF Main Gallery" |
-| `slug` | string (unique) | feed id used by displays: `/display/<slug>` |
-| `description` | text | optional room intro |
-| `operating_hours` | JSON | per-day open/close, used for scheduled screen on/off |
-| `floor_map_ref` | string | optional location reference |
+`wiki_ingest.parse_dokuwiki()` + `ingest_from_file()` upsert by `slug`:
 
-**Relations:**
-- `assets` — O2M ← `asset.room`
-- `devices` — O2M ← `display_device.room`
+- **new slug** → insert a full row (wiki fields + empty ExhibitOS-owned fields).
+- **existing slug, `content_hash` changed** → refresh the wiki-sourced fields only; the
+  ExhibitOS-owned display fields are untouched.
+- **existing slug, unchanged** → keep `sort_order` current and move on.
 
-### 5.3 Collection: `person` (Person)
-
-Inventors / architects / curators (e.g. Ken Yeager).
-
-| Field | Type | Notes |
-|---|---|---|
-| `name` | string (required) | "Ken Yeager" |
-| `credentials` | string | "MIT '72" |
-| `role_label` | string | "architect of the 3280" |
-| `bio` | text (rich) | full bio for interactive/deep content |
-| `portrait` | M2O → `media_item` | headshot |
-| `lifespan` | string | optional ("1949–2017") |
-
-**Relations:** `assets` — M2M ← `asset.people`.
-
-### 5.4 Collection: `media_item` (MediaItem)
-
-Photos/videos with **museum-grade attribution** (caption + source + credit are required
-for published items).
-
-| Field | Type | Notes |
-|---|---|---|
-| `file` | M2O → Directus `directus_files` | the actual upload (image or video) |
-| `media_type` | string (enum: image / video / external_video) | external_video = YouTube/Vimeo URL |
-| `external_url` | string (URL) | for external_video |
-| `caption` | text (required for published) | shown under the image |
-| `source` | string (required for published) | provenance ("Drive archive…", "techmonitor.ai") |
-| `credit` | string (required for published) | attribution ("by then-co-op Nick DeMarco") |
-| `alt_text` | string | accessibility |
-
-**Relations:** used by `asset.hero_image`, `asset.media`, `person.portrait`.
-
-### 5.5 Collection: `display_device` (Display Device)
-
-A screen. **Note:** this collection is *mirrored* — devices are registered in the
-ExhibitOS dashboard (the SoR for physical fleet state), and optionally represented in
-Directus for authors to assign content to. Live fleet status (online, heartbeat, IP)
-lives in the ExhibitOS SQLite fleet table, **not** Directus. See §9 open question on
-where device registration canonically lives.
-
-| Field | Type | Notes |
-|---|---|---|
-| `name` | string | "Main Gallery — left wall" |
-| `device_class` | string (enum: `passive` / `touchscreen`) | **gates the interactive form** |
-| `platform` | string (enum: `pi` / `fully-kiosk`) | selects fleet protocol |
-| `default_form` | string (enum: `card` / `video` / `interactive`) | what it renders |
-| `status` | string (active / maintenance / retired) | authoring-side state |
-
-**Relations:** `room` — M2O → `room`.
-
-### 5.6 Relations summary
-
-```
-asset ──M2O──▶ room
-asset ──M2M──▶ person
-asset ──M2M──▶ media_item        (hero_image is a distinct M2O)
-asset ──M2M──▶ asset             (related_assets, self-referential, with note)
-room  ──O2M──▶ display_device
-person ─M2O──▶ media_item        (portrait)
-```
+Counts (`created` / `updated` / `unchanged` / `total`) are returned to the caller so the
+dashboard can report what a re-ingest did.
 
 ---
 
@@ -393,18 +364,18 @@ Each form is **derived from one Asset record.** No form stores its own copy of c
 
 The card mirrors the structure of InfoAge's canonical sign template
 (`~/Workspaces/wiki/projects/concurrent-3280-museum/museum-sign.md`), which is the house
-style to match. Required structural elements, mapped to Asset fields:
+style to match. Required structural elements, mapped to `Exhibit` fields (§5):
 
-| Sign element (canonical template) | Asset field |
+| Sign element (canonical template) | `Exhibit` field |
 |---|---|
-| Title (big blue sans-serif, top-left) | `title` |
-| Hero photo + caption (upper-left) | `hero_image` → `media_item.file` + `.caption` |
-| Inventor portrait + credit (upper-right) | `people[0].portrait` + `.name` + `.credentials` + `.role_label` |
-| Bullets | `bullet_facts[]` |
-| "The Backstory:" sub-section | `backstory` |
-| QR code + caption (lower-right) | QR(`qr_target_url`) + fixed caption |
-| Closer / easter-egg strip (bottom) | `closer` |
-| Photo-slot list (production aid) | `media[]` with caption/source/credit |
+| Title (big blue sans-serif, top-left) | `title` (wiki) |
+| Hero photo + caption (upper-left) | `hero_image` (ExhibitOS-owned) |
+| Inventor / people credit (upper-right) | `people` (wiki, when present) |
+| Bullets | `key_facts` (wiki) |
+| "The Backstory:" sub-section | `body_text` (wiki) |
+| QR code + caption (lower-right) | QR(`deep_content_url` else `{qr_base_url}/{slug}`) + fixed caption |
+| Closer / easter-egg strip (bottom) | derived from `related_exhibits` / body |
+| Year / dateline | `year_introduced` (wiki) |
 
 **Requirements:**
 - The on-screen renderer displays the card at the room's display URL for any `passive`
@@ -412,41 +383,42 @@ style to match. Required structural elements, mapped to Asset fields:
 - A **printable export** produces a print-ready file matching the `infoage-house`
   template proportions and typography (ENIAC/UNIVAC/Wang style), suitable for the
   museum's existing 9-sign portfolio.
-- QR encodes `qr_target_url`, which resolves to the deep-content page (wiki entry +
+- QR encodes the deep-content target, which resolves to the deep-content page (wiki entry +
   embedded YouTube video).
 - The first real card is the **Concurrent 3280**, including the **SGI Onyx 10000**
-  `related_assets` cross-reference rendered in the closer/backstory.
+  cross-reference (`related_exhibits`) rendered in the closer/backstory.
 
 **Acceptance criteria:**
-- [ ] Given a published Asset, the on-screen card renders all eight structural elements,
-      pulling live from Directus (no hardcoded content).
+- [ ] Given an ingested exhibit, the on-screen card renders its structural elements from the
+      `Exhibit` read-cache (no hardcoded content).
 - [ ] The printable export of the 3280 card is visually consistent with InfoAge's
       existing signs when placed beside them (reviewed by InfoAge/VCF staff).
 - [ ] The QR scans on a phone and lands on the correct deep-content page with a working
       embedded YouTube video.
-- [ ] Editing any source field in Directus changes both the on-screen card and the next
-      printable export, with no code change.
+- [ ] Editing the exhibit's wiki page and re-ingesting changes both the on-screen card and
+      the next printable export, with no code change.
 - [ ] The 3280's "related exhibit" (Onyx 10000) appears in the rendered closer/backstory.
-- [ ] If Directus is unreachable, the card shows the last-cached content or a clear error
+- [ ] If the read-cache has no content for the room, the card shows a clear error
       state — **never demo/placeholder content** (see §9, §8).
 
 ### 6.2 Form 2 — Video Information Display
 
-A passive screen playing embedded video(s) for an asset or a whole room (generalized from
+A passive screen playing self-hosted video for an exhibit or a whole room (generalized from
 SignBoard's media-playback capability).
 
 **Requirements:**
 - Renders on any `passive` device with `default_form = video`.
-- Plays the Asset's `youtube_url` (or `media_item`s of type video / external_video) in a
-  loop; if a room is assigned (not a single asset), it cycles videos across the room's
-  published assets.
-- Honors scheduled screen on/off from the room's `operating_hours`.
+- Plays the exhibit's self-hosted `video_url` (an ExhibitOS-owned deliverable asset served
+  from the local mirror) in a loop; if a room is assigned (not a single exhibit), it cycles
+  videos across the room's exhibits. **No YouTube iframe on kiosks** (escape risk); YouTube is
+  the phone/QR deep-page only.
+- Honors scheduled screen on/off from the room's operating hours.
 - Muted autoplay by default (museum-appropriate); optional ambient audio per assignment.
 
 **Acceptance criteria:**
-- [ ] Assigning a video-bearing Asset to a passive display plays its video full-screen,
-      looped, muted.
-- [ ] A room assignment cycles through all published assets' videos in order.
+- [ ] Assigning a video-bearing exhibit to a passive display plays its self-hosted video
+      full-screen, looped, muted.
+- [ ] A room assignment cycles through all the room's exhibits' videos in order.
 - [ ] Screen powers off / on per operating hours (Pi via agent; Fully Kiosk via schedule).
 - [ ] No demo video plays when content is missing — error state instead.
 
@@ -457,14 +429,14 @@ Tap-through galleries and deeper dives, **gated to the `touchscreen` device clas
 **Requirements:**
 - Renders only on devices with `device_class = touchscreen`. A `passive` device never
   serves the interactive form, even if mis-assigned (the renderer enforces the gate).
-- Visitor can: scroll the interpretive body + backstory, swipe the `media[]` gallery
-  (each with caption/source/credit), open `person` bios, and tap a `related_assets` link
-  to jump to the related exhibit's interactive view (the 3280 → Onyx 10000 traversal).
+- Visitor can: scroll the interpretive body, read the key facts and people, view any
+  gallery imagery, and tap a `related_exhibits` link to jump to the related exhibit's
+  interactive view (the 3280 → Onyx 10000 traversal).
 - Idle timeout returns to an attract/home screen.
 
 **Acceptance criteria:**
-- [ ] On a touchscreen device, the interactive renders the gallery, person bios, and
-      related-asset navigation, all from Directus.
+- [ ] On a touchscreen device, the interactive renders the body, people, and
+      related-exhibit navigation, all from the `Exhibit` read-cache.
 - [ ] Tapping the Onyx 10000 cross-reference from the 3280 navigates to the Onyx
       interactive view and back.
 - [ ] A passive device assigned the interactive form refuses it and shows an error/
@@ -477,10 +449,12 @@ One admin surface controlling every sign across rooms / displays / assets, reusi
 SignBoard's dashboard + fleet specs.
 
 **Requirements — content control:**
-- Browse published Directus Assets; assign an Asset (or a Room feed) to a Display Device,
+- Browse ingested exhibits; assign an exhibit (or a Room feed) to a Display Device,
   choosing the deliverable Form and any render options.
+- Set the ExhibitOS-owned display fields (hero image, video, deep-content URL, location)
+  per exhibit, and trigger a **Re-ingest** from the wiki.
 - Manage schedules and scheduled/emergency overlays (carried from SignBoard).
-- Trigger a printable-card export for any Asset.
+- Trigger a printable-card export for any exhibit.
 
 **Requirements — fleet management (reuses `signboard-fleet-management-spec.md`):**
 - **Fleet tab** lists every device with live status: hostname, room, IP, version, uptime,
@@ -492,7 +466,7 @@ SignBoard's dashboard + fleet specs.
   bridged (not unified) in the UI.
 
 **Acceptance criteria:**
-- [ ] A curator can assign a published Asset to a display in a chosen Form without
+- [ ] A curator can assign an ingested exhibit to a display in a chosen Form without
       developer involvement (this is also §8's headline criterion).
 - [ ] The Fleet tab shows accurate online/offline within one heartbeat interval (Pi) or
       one poll interval (Fully Kiosk).
@@ -507,30 +481,33 @@ SignBoard's dashboard + fleet specs.
 
 ### 7.1 v1 — "3280 end-to-end" (the proof)
 
-- Directus stood up in Docker with the §5 content model.
-- The four deliverable forms implemented as renderers consuming Directus.
-- Display-assignment refactor of SignBoard tables + Directus Sync + local cache.
-- **One real exhibit (Concurrent 3280)** authored entirely in Directus, including the
-  Onyx 10000 cross-reference, hero photo, Yeager portrait, bullets, backstory, QR.
+- The `Exhibit` read-cache model + the wiki-ingest path (export file → idempotent upsert).
+  *(Built — `models/exhibit.py`, `services/wiki_ingest.py`, `scripts.ingest_wiki`.)*
+- The four deliverable forms implemented as renderers reading the read-cache.
+- Display-assignment refactor of SignBoard tables.
+- **One real exhibit (Concurrent 3280)** authored in the wiki and ingested, including the
+  Onyx 10000 cross-reference, hero photo, key facts, backstory, QR.
 - Rendered on **one or two real displays** at InfoAge (e.g. one passive card display + one
   touchscreen), plus a passive video display if a second screen is available.
 - Printable 3280 card matching InfoAge house style, reviewed by InfoAge/VCF staff.
-- Dashboard with content assignment + a working Fleet tab for the deployed devices.
+- Dashboard with content assignment + Re-ingest + a working Fleet tab for the deployed devices.
 - Operational handoff package (§8) delivered and validated with a real volunteer.
 
-### 7.2 Phase 2 — Full fleet + content depth
+### 7.2 Phase 2 — Live wiki ingest + content depth
 
+- **Live DokuWiki API ingest** (XML-RPC/REST) through the same parser, with scheduled re-ingest,
+  replacing the manual export-file step.
 - Full fleet across the gallery (many Pis + Onn sticks / Google TVs), broadcast ops,
   fleet polish (stale pruning, version-mismatch warnings, per-device log tail).
-- More exhibits authored by volunteers (the SGI Onyx 10000 as its own full record;
+- More exhibits authored by docents in the wiki (the SGI Onyx 10000 as its own full record;
   additional VCF artifacts).
-- Richer interactive content types (timelines, lineage diagrams as first-class media).
+- Richer interactive content types (timelines, lineage diagrams).
 - Offline-resilience hardening of the local cache (§9).
 
 ### 7.3 Phase 3 — More museums, more forms
 
-- Multi-museum support (tenancy model TBD — see §9): multiple Directus instances vs. a
-  single instance with a museum-scoping field.
+- Multi-museum support (one deployment per museum is already the v1 model — Phase 3 adds
+  turnkey packaging + documentation for external museums).
 - New deliverable forms (audio-tour, projection mapping, mobile companion web app, large
   donor/wayfinding boards).
 - Packaging ExhibitOS as a turnkey, documented open-source install for other small
@@ -547,93 +524,91 @@ requirement**, not documentation polish.
 
 ### 8.1 The handoff mechanism
 
-- **Directus authoring UI** is the volunteer's content surface — no JSON, no SSH, no code.
-  Roles restrict volunteers to authoring + the approval flow; admin/infra is separate.
-- **ExhibitOS dashboard** is the volunteer's display-control surface — assign content,
-  schedule, export print, and recover a frozen screen via the Fleet tab.
+- **The docent wiki** is the volunteer's content surface — the same tool they already use, with
+  its own accounts, drafts, revision history, and revert. No JSON, no SSH, no code.
+- **ExhibitOS dashboard** is the volunteer's display-control surface — set display assets,
+  Re-ingest, assign content, schedule, export print, and recover a frozen screen via the
+  Fleet tab.
 - Together these mean **every routine task is self-service.**
 
 ### 8.2 Required handoff deliverables (part of v1 "done")
 
-- A **volunteer runbook** (in-repo + printable) covering: add an exhibit, edit a card,
-  upload media with proper attribution, submit for review, assign to a display, export a
+- A **volunteer runbook** (in-repo + printable) covering: author/edit an exhibit in the wiki,
+  Re-ingest, set the display assets (hero/video/deep-link), assign to a display, export a
   printable card, and recover an offline/frozen screen.
-- A **roles + review workflow** configured in Directus: Author → submits Draft →
-  Reviewer approves → Published. No volunteer can break the live signs by accident.
-- An **admin setup guide** for the one technical owner (mini PC, Docker, Directus, kiosk
-  provisioning) — used once, then rarely.
+- **Reliance on the wiki's own review/revision controls** — authors edit in the wiki, every
+  change is a tracked, attributable, revertible revision. ExhibitOS implements no separate
+  approval workflow.
+- An **admin setup guide** for the one technical owner (mini PC, Docker, wiki-ingest
+  connection, kiosk provisioning) — used once, then rarely.
 
 ### 8.3 Acceptance criteria (the headline test)
 
-- [ ] **A non-technical museum volunteer, given only the runbook, can add a new exhibit,
-      edit an existing card, and assign it to a display — start to finish, with zero
+- [ ] **A non-technical museum volunteer, given only the runbook, can author a new exhibit in
+      the wiki, Re-ingest it, and assign it to a display — start to finish, with zero
       developer involvement.** (Validated by observing a real InfoAge volunteer do it.)
 - [ ] The same volunteer can recover a frozen display via the Fleet tab without SSH.
 - [ ] No routine content or display task requires editing files, running scripts, or
       contacting a developer.
-- [ ] When a backend service (Directus / a display) is unavailable, the system shows a
-      clear error state with a documented recovery step — **never demo/placeholder data.**
+- [ ] When content is unavailable (a display offline, the read-cache empty for a room), the
+      system shows a clear error state with a documented recovery step — **never
+      demo/placeholder data.**
 
 ---
 
 ## 9. Open Questions / Decisions Needed
 
-### 9a. Resolved Decisions (2026-05-31)
+### 9a. Resolved Decisions
 
-1. **Printable-card export pipeline → Playwright (headless Chromium). RESOLVED.**
+1. **Content source of truth → the docent wiki; ExhibitOS ingests. RESOLVED (2026-06-02).**
+   The museum's existing DokuWiki is the system of record for exhibit narrative and its
+   revision history; ExhibitOS ingests it into the `Exhibit` read-cache and renders it. No CMS
+   and no separate edit/approval/revision system. A self-hosted CMS was explored and passed on.
+   See [`decisions/0001-content-source.md`](decisions/0001-content-source.md).
+
+2. **Display order → source order. RESOLVED.**
+   Display order is driven by the exhibit's `sort_order` (its position in the wiki source),
+   which the ingest sets and keeps current on every re-ingest. This is more reliable than the
+   parsed `year_introduced` (many "years" in the source are model numbers, not dates).
+
+3. **Re-ingest is idempotent. RESOLVED.**
+   Ingest upserts by `slug`: wiki-sourced fields refresh only when the parsed `content_hash`
+   changes; the ExhibitOS-owned display fields are never overwritten. Re-ingest is safe to run
+   any number of times (admin Re-ingest button / CLI / future schedule).
+
+4. **Printable-card export pipeline → Playwright (headless Chromium). RESOLVED.**
    The card renders on-screen *and* prints, and both must match each other and InfoAge's
    existing sign portfolio. Playwright drives the same Chromium that renders the on-screen
-   card, so one HTML/CSS template yields pixel-identical screen and print output.
-   WeasyPrint was rejected: its separate rendering engine drifts from the on-screen card
-   and would force two maintained looks. The only cost — bundling Chromium in the image —
-   is acceptable because export runs **server-side on the mini PC, never on kiosks**.
+   card, so one HTML/CSS template yields pixel-identical screen and print output. The only
+   cost — bundling Chromium in the image — is acceptable because export runs **server-side on
+   the mini PC, never on kiosks**.
 
-2. **QR resolution → configurable base URL + per-exhibit path. RESOLVED.**
-   A single global setting `qr_base_url`; each Asset has a `slug`; the QR resolves to
-   `{qr_base_url}/{slug}`. Changing the base once repoints every QR. An optional
-   per-Asset **absolute-URL override** handles the exception case where one exhibit's deep
-   content lives elsewhere (e.g. a specific vcfed.org wiki page). This supersedes the
-   earlier open question on QR deep-content hosting — the *target* is configurable rather
-   than hard-bound to any one host.
+5. **QR resolution → configurable base URL + per-exhibit path. RESOLVED.**
+   A single global `qr_base_url`; each exhibit has a `slug`; the QR resolves to
+   `{qr_base_url}/{slug}`. Changing the base once repoints every QR. An exhibit's
+   `deep_content_url` (ExhibitOS-owned) handles the case where one exhibit's deep content lives
+   at a specific page (e.g. a vcfed.org wiki page).
 
-3. **Offline resilience → two-tier cache. RESOLVED.**
-   (a) **Server-side mirror** on the mini PC: ExhibitOS holds the authoritative cached
-   copy of Directus content + media; displays always hit ExhibitOS, never Directus
-   directly. (b) **Kiosk-local cache** on each Pi / repurposed legacy PC: every kiosk has
-   real local storage, so it keeps showing its last-known-good content through a network
-   or server outage and degrades gracefully instead of going blank. Cache-invalidation
-   mechanism (Directus publish webhook vs. poll) and staleness window still to be set in
-   the architecture stage.
-
-4. **Multi-museum tenancy → one deployment per museum (Option A). RESOLVED.**
-   Each museum runs its own ExhibitOS + Directus stack on its own hardware; data is fully
-   isolated per museum. "Generic platform" means *the same open-source code anyone can
-   deploy*, not one shared instance hosting many museums. **Consequence: the schema stays
-   single-museum — no `museum` scoping field is added to collections.** This removes
-   tenancy complexity from the build entirely.
+6. **Multi-museum tenancy → one deployment per museum (Option A). RESOLVED.**
+   Each museum runs its own ExhibitOS stack (and ingests its own wiki) on its own hardware;
+   data is fully isolated per museum. "Generic platform" means *the same open-source code
+   anyone can deploy*, not one shared instance. The schema stays single-museum.
 
 ### 9b. Still Open
 
-5. **Auth model between ExhibitOS and Directus.** A **static read-only Directus API
-   token** scoped to published content (simple, recommended for v1) vs. a service account
-   with a rotating token vs. Directus's role-based API keys. Also: should the ExhibitOS
-   dashboard's admin auth and Directus's user accounts be unified (SSO) or kept separate
-   (two logins)? Separate is simpler for v1; unified is nicer for volunteers long-term.
+7. **Wiki read access for ingest.** ExhibitOS needs a read path into the docent wiki. v1
+   ingests a DokuWiki **export file**; the next step is the **live DokuWiki API** (XML-RPC/REST)
+   with a read-only docent account, or a scheduled export. Confirm the wiki's API is enabled and
+   agree on an access method (tracked in [`OPEN-QUESTIONS.md`](OPEN-QUESTIONS.md) §6).
 
-6. **Where does device registration canonically live?** §5.5 mirrors devices into
-   Directus for authoring convenience, but live fleet state lives in ExhibitOS SQLite.
-   Decide whether `display_device` exists in Directus at all, or whether the dashboard is
-   the sole SoR for devices and authors assign content to *rooms* rather than to specific
-   devices. Leaning: devices live only in ExhibitOS; authors assign to rooms.
+8. **Public deep-content target for QR.** The docents' wiki is login-gated, so a *public*
+   visitor-readable deep page is still needed (ExhibitOS hosts it, or VCF opens a public wiki
+   section). Tracked in [`OPEN-QUESTIONS.md`](OPEN-QUESTIONS.md) §2.
 
-7. **Directus revenue-tier compliance.** The free self-hosted tier is conditioned on the
-   deploying org being under $5M revenue. Confirm InfoAge / VCF qualifies, and document
-   the licensing posture for downstream museums that adopt ExhibitOS.
-
-8. **Form-per-asset vs. form-per-assignment overrides.** `asset.card_template` and
-   `display_device.default_form` both influence rendering. Decide the precedence rules
-   when an assignment specifies a form different from the device default (e.g. can a
-   curator force a card onto a video-default screen for a day?).
+9. **Form-per-exhibit vs. form-per-assignment overrides.** The chosen card template and the
+   device's `default_form` both influence rendering. Decide the precedence rules when an
+   assignment specifies a form different from the device default (e.g. can a curator force a
+   card onto a video-default screen for a day?).
 
 ---
 
@@ -641,6 +616,7 @@ requirement**, not documentation polish.
 
 | Version | Date | Author | Changes |
 |---|---|---|---|
-| 0.1 | 2026-05-31 | Nick DeMarco (AI-assisted) | Initial first draft. Locked decisions documented (Directus as SoR, ExhibitOS as renderer+fleet, four v1 forms, 3280 first exhibit). |
+| 0.1 | 2026-05-31 | Nick DeMarco (AI-assisted) | Initial first draft. Documented a self-hosted CMS as the content system of record, ExhibitOS as renderer+fleet, four v1 forms, 3280 first exhibit. (That content-source decision was later reversed — see 0.4 and ADR-0001.) |
 | 0.2 | 2026-05-31 | Nick DeMarco (AI-assisted) | Resolved 4 open questions (§9a): Playwright card export; configurable `qr_base_url` + per-exhibit slug; two-tier cache (server mirror + kiosk-local); one-deployment-per-museum tenancy (schema stays single-museum). |
 | 0.3 | 2026-06-01 | Nick DeMarco (AI-assisted) | Kept original link-target wiki architecture (no publish-to-wiki, no public-deep-page render target). **Kiosk video policy:** kiosks play self-hosted HTML5 `<video>` only — no YouTube iframe on kiosks (public-kiosk escape risk); YouTube reserved for phone/QR deep page. Added kiosk URL-allowlist navigation lockdown (issue #37). Media mirror now holds video binaries. |
+| 0.4 | 2026-06-05 | Nick DeMarco (AI-assisted) | **Content architecture refactor (ADR-0001).** Rewrote the design around the **docent wiki as system of record + ExhibitOS wiki-ingest**: replaced the earlier two-systems/CMS framing (§1–§4) with wiki-ingest, and the multi-collection CMS content model (§5) with the single `Exhibit` read-cache model (slug/content_hash idempotency, ExhibitOS-owned display fields preserved across re-ingest, source-order ordering — all matching the built code). Updated the four forms (§6), v1 scope (§7), handoff (§8 — review via the wiki's own revision control), and resolved/open decisions (§9). The previously-evaluated CMS is kept only as the explored option (see ADR-0001, which links to the explored-option primer). |

@@ -57,16 +57,17 @@ recover a frozen display, without touching code or calling a developer.
 
 - **Free and open-source (MIT).** No license fees, ever. The museum can use it, modify it,
   and keep it forever.
-- **No per-screen SaaS fees, no vendor lock-in.** Content lives in **Directus**, a free
-  self-hosted CMS with no feature paywall for a nonprofit your size. Nothing about this
-  arrangement can be taken away or priced up later.
+- **No per-screen SaaS fees, no vendor lock-in.** Exhibit content stays in **your own docent
+  wiki** — where your docents already write it — and ExhibitOS reads from it. Nothing about this
+  arrangement can be taken away or priced up later, and you keep authoring where you already do.
 - **Cheap, ordinary hardware.** The whole system runs in Docker on **one mini PC**. Screens
   are inexpensive — ~$20 streaming sticks, Raspberry Pis, or even repurposed legacy PCs
   (fittingly, for a computer museum).
-- **Volunteer-runnable by design.** Authoring, approval, display assignment, and even
-  recovering a frozen screen are all self-service web tasks. This is a first-class
-  requirement, not a hope: a non-technical volunteer, given only a short runbook, should be
-  able to add an exhibit and put it on a screen start to finish.
+- **Volunteer-runnable by design.** Authoring stays in the wiki your docents already use;
+  display assignment and even recovering a frozen screen are all self-service web tasks in the
+  ExhibitOS dashboard. This is a first-class requirement, not a hope: a non-technical volunteer,
+  given only a short runbook, should be able to write an exhibit in the wiki and put it on a screen
+  start to finish.
 - **Built by one of your own.** It's being developed by the Concurrent 3280's docent, for
   this museum first — not adapted from a generic product that doesn't understand museums.
 
@@ -83,7 +84,7 @@ that ties the gallery together.
 
 The pilot would deliver the full picture in miniature:
 
-- the 3280 authored once in Directus;
+- the 3280's placard text authored once in your docent wiki, ingested by ExhibitOS;
 - its **printed sign matching your existing house style**, reviewed side-by-side with your
   current signs before anything goes on a wall;
 - the on-screen card, a video display, and a touchscreen interactive, all from that one
@@ -102,15 +103,15 @@ plan well together:
   envisioned, and roughly how many, so we can recommend cheap, compatible options.
 - **Network basics for the new space** — is there Wi-Fi / wired networking the displays and
   mini PC can share?
-- **Who would author and curate content** — which volunteers, and how you'd want the
-  review/approval step to work.
+- **Which wiki content to ingest** — which docents author, and which wiki pages/namespace
+  ExhibitOS should pull from (review and revision history already live in the wiki).
 - **Where deep-content (phone) pages should live** — your own wiki, a museum page, or
   somewhere we host. ExhibitOS points the QR wherever you prefer.
 
 ## Cost reality
 
-- **Software: ≈ $0.** MIT-licensed; Directus free self-hosted tier; Docker on hardware you
-  likely already have or can repurpose.
+- **Software: ≈ $0.** MIT-licensed; Docker on hardware you likely already have or can repurpose;
+  content stays in the wiki you already run.
 - **Hardware: ≈ $20–50 per screen** (streaming stick, Raspberry Pi, or repurposed PC), plus
   the displays themselves.
 - **The real cost is content authoring effort** — writing and curating the interpretation

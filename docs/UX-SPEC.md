@@ -1,10 +1,14 @@
 # UX Design Specification: ExhibitOS
 
-**Version:** 0.2
-**Date:** 2026-06-01
+> **Content architecture:** the docent wiki is the source of truth — see
+> [`decisions/0001-content-source.md`](decisions/0001-content-source.md) (a CMS was explored and
+> passed on). Narrative content is authored in the wiki; ExhibitOS renders the ingested content.
+
+**Version:** 0.3
+**Date:** 2026-06-05
 **Author:** Nick DeMarco, with AI assistance
 **Status:** Draft
-**PRD Reference:** `docs/PRD.md` (v0.3)
+**PRD Reference:** `docs/PRD.md` (v0.4)
 **Wiki Reference:** `wiki/projects/concurrent-3280-museum/museum-sign.md`
 
 ---
@@ -13,7 +17,7 @@
 
 ### 1.1 Design Vision
 
-ExhibitOS surfaces one authoring surface and three display surfaces, bound together by a single content record. The curator writes once in Directus; the visitor reads from a physical card, a passive video screen, or a touchscreen kiosk; the dashboard connects the two. Every design decision in this document serves that constraint.
+ExhibitOS surfaces three display surfaces, fed by content authored in the museum's docent wiki and bound together by a single ingested exhibit record. The docent writes once in the wiki they already use; ExhibitOS ingests it; the visitor reads from a physical card, a passive video screen, or a touchscreen kiosk; the dashboard connects content to displays. Every design decision in this document serves that constraint.
 
 The visual language is deliberately neutral — warm off-white paper tones that evoke a reading environment, not a tech product. The museum's content (photos, prose, artifacts) is the spectacle. ExhibitOS's chrome is the frame.
 
@@ -21,7 +25,7 @@ The visual language is deliberately neutral — warm off-white paper tones that 
 
 | Decision | Choice | Rationale |
 |---|---|---|
-| Directus authoring UX | Field grouping with contextual help text, not custom forms | Non-technical volunteers; Directus's native UI is already battle-tested for this. Custom forms would require maintenance. |
+| Narrative authoring | **In the docent wiki** (the tool docents already use), ingested by ExhibitOS | Reuses the docents' existing authoring tool + its revision control; ExhibitOS adds no content editor to build or maintain (ADR-0001). |
 | Card layout model | **Two fixed designed canvases — landscape 1920×1080 and portrait 1080×1920 — scaled-to-fit** (DisplayCanvas extended with a `portrait` design size) | Consistent cross-device rendering at distance; full portrait support in v1 (ARCHITECTURE §6a, 2026-06-01). A portrait sign is a distinct composition, not a rotated landscape. |
 | Per-display Display Profile | **Profile = orientation + resolution + DPR (auto-detected) + physical size + viewing distance (manual) + class** | Drives orientation layout + physical text-scale so one Asset is legible on a 24″ desk monitor and a 75″ wall TV (ARCHITECTURE §6a). |
 | Video / touch layout model | **Responsive to the actual viewport (no fixed canvas)** | Video `object-fit: contain`; touch fluid grid. Adapt to any resolution/orientation/4K without bars (ARCHITECTURE §6a.2). |
@@ -49,7 +53,7 @@ These expand on PRD §3; abbreviated here for reference.
 
 ### 2.1 Doug — Curator / Volunteer Author
 
-Non-technical. Comfortable with web forms and word processors. Will use Directus's admin UI to write exhibit records, upload photos, and submit for review. Will use the ExhibitOS dashboard to assign exhibits to displays and export print-ready cards. Success criterion: completes the full workflow from the runbook without calling a developer.
+Non-technical. Comfortable with web forms and word processors. Authors exhibit narrative in the **docent wiki** he already uses (titles, interpretive text, key facts, people). Uses the ExhibitOS dashboard to Re-ingest, attach display assets (hero photo, video), assign exhibits to displays, and export print-ready cards. Success criterion: completes the full workflow from the runbook without calling a developer.
 
 ### 2.2 Maria — Museum Visitor
 
@@ -61,208 +65,51 @@ Provisions hardware and Docker once. Rarely touches the system after handoff. Us
 
 ---
 
-## 3. Directus Authoring UX
+## 3. Authoring & the Content Path
 
-Directus provides a configurable admin UI where fields can be grouped, labelled, and annotated with help text. This section specifies exactly how each collection should be configured so that Doug can author an exhibit without confusion.
+Narrative content is authored in the museum's **docent wiki** (DokuWiki) — the tool the docents already use, with its own accounts, drafts, revision history, diffs, attribution, and revert. **ExhibitOS does not provide a content editor** and does not author narrative; it **ingests** the wiki into the `Exhibit` read-cache and renders it (ADR-0001).
 
-### 3.1 Principle: configure Directus, do not replace it
+This section therefore covers the two ExhibitOS-side authoring touchpoints — Re-ingest and the display-side fields — and the end-to-end happy path. The wiki's own editing UX is out of ExhibitOS's scope.
 
-The goal is a thoughtfully configured content model in Directus's native admin — not a custom form app. Each specification below is a Directus field-configuration instruction (group name, field label, help text, required flag, interface type), not a custom-built component.
+### 3.1 Principle: author in the wiki, render in ExhibitOS
 
-### 3.2 Collection: Asset — field layout and grouping
+- **Narrative** (title, interpretive text, key facts, people, year, relationships) is written and revised **in the wiki**. The wiki is the source of truth and keeps the revision history.
+- **ExhibitOS owns only the display side:** which exhibit shows where (assignment), the schedule, the fleet, and the **deliverable assets** the wiki doesn't naturally hold — `hero_image`, `video_url`, `deep_content_url`, `location`. These are set in the dashboard and **preserved across re-ingest**.
+- **Ingest** maps each wiki exhibit page to one `Exhibit` row, keyed by a url-safe `slug`, refreshing wiki-sourced fields only when the content changes (`content_hash`) and ordering by source position (`sort_order`).
 
-The Asset collection is the central authoring surface. Configure it with four field groups presented in top-to-bottom order on the Directus detail form.
+### 3.2 The `Exhibit` fields a curator sees in the dashboard
 
----
+The dashboard's Exhibits tab is **read-only for wiki-sourced fields** (title, body, key facts, people, year — edited in the wiki) and **editable for the ExhibitOS-owned display fields**:
 
-**Group 1: Identity** (always visible at the top)
+| Field | Where it's set | Help text |
+|---|---|---|
+| Title, story, key facts, people, year | **Wiki** (read-only here) | "Edit these in the docent wiki, then Re-ingest." |
+| `hero_image` | Dashboard | "The main photograph for the card and interactive. Upload or pick the file." |
+| `video_url` | Dashboard | "A self-hosted video for this exhibit's video display (no YouTube on kiosks)." |
+| `deep_content_url` | Dashboard | "The page the QR points to. Leave blank to use the default base URL + slug." |
+| `location` | Dashboard | "Where the artifact physically sits (room/gallery reference)." |
 
-| Field | Display label | Interface | Required | Help text |
-|---|---|---|---|---|
-| `title` | Exhibit title | Text input | Yes | "The name displayed large at the top of the sign. E.g. 'The Concurrent 3280'" |
-| `subtitle` | Subtitle / tagline | Text input | No | "A one-line description that appears under the title. E.g. 'The last great pre-RISC scalar minicomputer'" |
-| `slug` | URL slug | Text input (auto-generated from title) | Yes | "Used in QR codes and URLs. Generated automatically — only change it if the title changes significantly." |
-| `status` | Status | Dropdown (Draft / In Review / Published / Archived) | Yes | "Set to Draft while writing. Submit for review when ready. Only Published exhibits appear on displays." |
-| `featured` | Featured | Toggle | No | "Pin this exhibit to the top of dashboard lists." |
+### 3.3 Re-ingest (the wiki → ExhibitOS refresh)
 
----
+A **Re-ingest** action (dashboard button, also `python -m scripts.ingest_wiki`) pulls the latest wiki content into the read-cache. It reports counts — *created / updated / unchanged* — so the curator can confirm the edit landed. Re-ingest is idempotent and safe to run repeatedly; it never touches the ExhibitOS-owned display fields above.
 
-**Group 2: The Card** (collapsible, open by default)
+### 3.4 Add a New Exhibit — Happy Path (end-to-end)
 
-This group contains every field rendered on the interpretive card. Label the group "Interpretive Card Content" so Doug knows exactly what this drives.
+The step-by-step journey for Doug bringing the Concurrent 3280 to a screen.
 
-| Field | Display label | Interface | Required | Help text |
-|---|---|---|---|---|
-| `hero_image` | Hero photo | Relation (to media_item) | Yes | "The main photograph displayed on the upper-left of the sign. Create a Media Item first, then select it here." |
-| `bullet_facts` | Key facts (bullet list) | Repeater / JSON (one text line per item) | Yes (min 3) | "Short facts shown as bullets on the sign. Write each as a complete, standalone sentence. 6–10 bullets works well." |
-| `interpretive_body` | Main story | Rich text / Markdown | Yes | "The narrative paragraph(s) on the sign. 150–250 words is typical for the InfoAge house style." |
-| `backstory` | Backstory section | Rich text / Markdown | No | "Appears under the 'The Backstory:' header on the sign. Provides deeper historical context." |
-| `closer` | Closing line | Text input | No | "The single memorable sentence in the bottom strip. E.g. 'Designed in NJ. Built in NJ. The architect who built it shaped the chip that replaced it.'" |
-| `card_template` | Print style | Dropdown (InfoAge House / Generic) | Yes | "Choose 'InfoAge House' to match the existing signs at the VCF museum." |
+**Step 1 — Author in the wiki.** Doug opens the artifact's page in the docent wiki and writes the title, interpretive text, key facts, people (Ken Yeager), and year. He saves; the wiki records the revision.
 
----
+**Step 2 — Re-ingest.** In the ExhibitOS dashboard, Doug clicks **Re-ingest**. The new/edited exhibit appears in the Exhibits tab (e.g. "created: 1"). Its wiki-sourced fields are now in the read-cache, keyed by slug `concurrent-3280`.
 
-**Group 3: Deep Content & QR** (collapsible)
+**Step 3 — Attach display assets.** Doug opens the exhibit in the dashboard and sets the ExhibitOS-owned fields: the hero photo (1985 lab shot), an optional self-hosted video, the deep-content URL (or leaves it blank to use `{qr_base_url}/concurrent-3280`), and the location. These persist across future re-ingests.
 
-| Field | Display label | Interface | Required | Help text |
-|---|---|---|---|---|
-| `qr_target_url` | QR destination URL | URL input | No | "Leave blank to use the default (base URL + slug). Override only if the deep content page has a specific permanent URL." |
-| `deep_content_url` | Deep content page | URL input | No | "The wiki or web page this exhibit's full story lives on (linked from QR and touchscreen)." |
-| `youtube_url` | YouTube video URL | URL input | No | "Full YouTube URL — embedded on the **phone/QR deep-content page only**. On-floor video screens play the self-hosted video file you upload as a Video media item, not YouTube." |
+**Step 4 — Assign to a display.** Doug goes to Rooms > VCF Main Gallery, picks "Main Gallery — left wall," clicks **Assign Content**, selects "The Concurrent 3280," chooses Form: Card, and saves. The display shows the card (WebSocket push or refetch).
 
----
+> The display's **Display Profile** (resolution/orientation/DPR) is auto-detected on first connect, and its physical size + viewing distance were entered once by the admin at provisioning (§7.4a). Doug never touches the profile — the card renders in the right orientation at the right text scale. A portrait sign yields the portrait card composition (§4.2a) from the same "assign card" action.
 
-**Group 4: Relations** (collapsible)
+**Step 5 — Export the printable card.** Doug opens the exhibit, clicks **Export printable card**; ExhibitOS runs Playwright against the card renderer and returns a PDF. He sends it to the museum's print vendor.
 
-| Field | Display label | Interface | Required | Help text |
-|---|---|---|---|---|
-| `room` | Room / Location | Relation (to Room) | No | "Which gallery or room this exhibit is physically located in." |
-| `people` | People (inventors, architects) | Many-to-many relation (to Person) | No | "Link the people associated with this exhibit. Their portrait and credentials appear on the card." |
-| `media` | Gallery images | Many-to-many relation (to Media Item) with sort | No | "Additional photos for the touchscreen gallery. Drag to reorder. The hero photo does not need to be repeated here." |
-| `related_assets` | Related exhibits | Self-referential M2M (to Asset) with note | No | "Link exhibits that tell a connected story. Add a short note explaining the connection. E.g. 'Same architect, 30 ft away.'" |
-
----
-
-### 3.3 Collection: Media Item — field layout
-
-Media Items are created before being attached to an Asset. Configure the form with one group:
-
-| Field | Display label | Interface | Required | Help text |
-|---|---|---|---|---|
-| `file` | Upload file | File upload | Yes (for image/video) | "Upload the image or video file. For YouTube/Vimeo, use 'External Video' type and paste the URL instead." |
-| `media_type` | Type | Dropdown (Image / Video / External Video) | Yes | "Choose 'External Video' for YouTube or Vimeo links — no file upload needed." |
-| `external_url` | External video URL | URL input | Conditional on media_type = external_video | "Paste the full YouTube or Vimeo URL." |
-| `caption` | Caption | Text input | Yes (for published) | "Displayed under the photo on signs and in the gallery. Describe what is shown." |
-| `source` | Source / provenance | Text input | Yes (for published) | "Where this image came from. E.g. 'Drive archive — 1985 lab shoot' or 'techmonitor.ai archive'" |
-| `credit` | Credit / attribution | Text input | Yes (for published) | "Who to credit. E.g. 'Photo by Nick DeMarco, 1985' or 'Courtesy InfoAge Science Center'" |
-| `alt_text` | Alt text (accessibility) | Text input | No | "A brief description for screen readers and if the image fails to load." |
-
----
-
-### 3.4 Collection: Person — field layout
-
-| Field | Display label | Interface | Required | Help text |
-|---|---|---|---|---|
-| `name` | Full name | Text input | Yes | "E.g. 'Ken Yeager'" |
-| `credentials` | Credentials / degree | Text input | No | "E.g. 'MIT '72' — shown in small text next to the name on the sign." |
-| `role_label` | Role at this museum | Text input | No | "E.g. 'Architect of the 3280' — the one-line descriptor on the sign." |
-| `lifespan` | Lifespan | Text input | No | "E.g. '1949–2017' — displayed with the portrait if provided." |
-| `portrait` | Portrait photo | Relation (to Media Item) | No | "Headshot displayed upper-right on the interpretive card." |
-| `bio` | Full biography | Rich text | No | "Shown in the touchscreen interactive's person detail view." |
-
----
-
-### 3.5 Collection: Room — field layout
-
-| Field | Display label | Interface | Required | Help text |
-|---|---|---|---|---|
-| `name` | Room name | Text input | Yes | "E.g. 'VCF Main Gallery'" |
-| `slug` | Display feed URL | Text input (auto) | Yes | "Displays subscribe to /display/[slug]. Auto-generated — change with care; it will break existing screen subscriptions." |
-| `description` | Room description | Text area | No | "Optional intro text for the room." |
-| `operating_hours` | Operating hours | JSON (or structured repeater) | No | "Per-day open/close times used for automatic screen on/off. Leave blank for always-on." |
-
----
-
-### 3.6 Add a New Exhibit — Happy Path (end-to-end authoring flow)
-
-This is the step-by-step user journey for Doug authoring the Concurrent 3280 from scratch. Every step happens in Directus.
-
-**Prerequisites:** Doug has a Directus account with the Author role. He has the hero photo and portrait ready as files on his computer.
-
----
-
-**Step 1: Create the Media Items (photos first)**
-
-Doug navigates to Content > Media Items > Create New.
-
-He fills in:
-- File: uploads the 1985 lab photo (the hero image)
-- Type: Image
-- Caption: "Concurrent 3280 cabinet, Tinton Falls NJ engineering lab, December 1985"
-- Source: "Drive archive — Nick DeMarco personal collection"
-- Credit: "Photo by Nick DeMarco, 1985"
-- Alt text: "Large 1980s minicomputer cabinet in an engineering lab"
-
-He saves. He repeats for the Yeager portrait (to use in the Person record), and for each additional gallery photo.
-
-Why photos first: the Asset form's hero_image field is a relation — Doug needs the Media Item to exist before he can link it. The help text on the hero_image field reads: "Create a Media Item first, then select it here." This is the one authoring-order dependency and the runbook must make it explicit.
-
----
-
-**Step 2: Create the Person record (Ken Yeager)**
-
-Doug navigates to Content > People > Create New.
-
-He fills in:
-- Name: Ken Yeager
-- Credentials: MIT '72
-- Role label: Architect of the 3280
-- Lifespan: 1949–2017
-- Portrait: selects the Yeager Media Item created in Step 1
-
-He saves.
-
----
-
-**Step 3: Create the Asset record**
-
-Doug navigates to Content > Assets > Create New.
-
-**Group 1 — Identity:**
-- Exhibit title: The Concurrent 3280
-- Subtitle: The last great pre-RISC scalar minicomputer
-- Slug: concurrent-3280 (auto-generated; Doug leaves it)
-- Status: Draft
-
-**Group 2 — The Card:**
-- Hero photo: selects the 1985 lab photo Media Item
-- Key facts (bullets): Doug types each bullet as a line in the repeater
-- Main story: types the interpretive body
-- Backstory: types the Backstory section
-- Closing line: "Designed in NJ. Built in NJ. The architect who built it shaped the chip that replaced it. And both machines now sit retired in this museum — about thirty feet apart."
-- Print style: InfoAge House
-
-**Group 3 — Deep Content & QR:**
-- QR destination URL: leaves blank (will use base URL + slug)
-- YouTube video URL: pastes the YouTube video URL
-
-**Group 4 — Relations:**
-- Room: selects "VCF Main Gallery"
-- People: clicks Add, searches "Yeager", selects Ken Yeager
-- Gallery images: adds the Schottky TTL board photo and the Onyx 10000 photo
-- Related exhibits: clicks Add, types "Onyx", selects "SGI Onyx 10000", adds note "Same architect — Ken Yeager designed the MIPS R10000 that powers it. 30 ft from this machine."
-
-Doug saves as Draft.
-
----
-
-**Step 4: Submit for review**
-
-Doug changes Status from Draft to In Review. Directus notifies the Reviewer role (configured in Directus's notification settings). The reviewer opens the record, reads it, and changes Status to Published. If changes are needed, the reviewer comments in Directus's built-in comments panel and sets status back to Draft.
-
-Doug receives a notification. He makes edits, saves, sets back to In Review.
-
----
-
-**Step 5: Assign to a display (in the ExhibitOS dashboard)**
-
-Once Published, Doug opens the ExhibitOS dashboard (separate URL, separate login for v1). He navigates to Rooms > VCF Main Gallery. He sees the "Main Gallery — left wall" display. He clicks "Assign Content", selects "The Concurrent 3280" from the published assets list, chooses Form: Card. He saves. The display immediately shows the card (via WebSocket push or 60s poll). Done.
-
-> The display's **Display Profile** (resolution/orientation/DPR) is auto-detected the first time the screen connects, and its physical size + viewing distance were entered once by the admin at provisioning (§7.4a). Doug never touches the profile — the card automatically renders in the right orientation at the right text scale. If the display is a portrait sign, Doug's identical "assign card" action yields the portrait card composition (§4.2a) with no extra step.
-
----
-
-**Step 6: Export the printable card (in the ExhibitOS dashboard)**
-
-Doug navigates to Assets > The Concurrent 3280. He clicks "Export printable card". The dashboard POSTs to the ExhibitOS server, which runs Playwright headless against the card renderer URL, and returns a PDF download. Doug saves the PDF and sends it to the museum's print vendor.
-
----
-
-**Fix a typo (the simplest journey):**
-
-Doug opens Content > Assets > The Concurrent 3280 in Directus. He edits the field. He saves. The on-screen card updates on the next content refresh (server poll from Directus, then pushed to displays). No other step needed.
-
----
+**Fix a typo (the simplest journey):** Doug edits the page **in the wiki** and saves (the wiki keeps the revision); he clicks **Re-ingest**; the on-screen card and the next print export both update. No other step.
 
 ## 4. Interpretive Card — On-Screen and Printable
 
@@ -399,15 +246,12 @@ This is the worked example showing how the field values map to the card layout.
 - Caption: "Concurrent 3280 cabinet, photographed in the Tinton Falls NJ engineering lab, December 1985"
 - Credit: "Photo by Nick DeMarco, 1985"
 
-**Right column, portrait:**
-- Photo: Ken Yeager headshot (from `people[0].portrait`)
-- Name: "Ken Yeager"
-- Credentials: "MIT '72"
-- Role: "Architect of the 3280"
-- Lifespan: "1949–2017"
+**Right column, people:**
+- From `people` (wiki): "Ken Yeager — architect of the 3280"
+- The hero image is the ExhibitOS-owned `hero_image`; a portrait, if available, is a gallery image attached to the exhibit.
 
 **Left column, bullets ("AT A GLANCE"):**
-The first six bullets from `bullet_facts[]`, rendered in order. Example:
+The first six facts from `key_facts` (wiki), rendered in order. Example:
 - "The last great pre-RISC scalar minicomputer."
 - "Designed in New Jersey during the Perkin-Elmer to Concurrent Computer transition (Nov 1985 spinoff)."
 - "Released January 26, 1988 — 3280SP single-processor, 6 MIPS."
@@ -416,10 +260,10 @@ The first six bullets from `bullet_facts[]`, rendered in order. Example:
 - "Ken Yeager (MIT '72) later architected the MIPS R10000 — the chip inside the Onyx 10000, thirty feet from here."
 
 **Left column, interpretive body:**
-From `interpretive_body`. 180 words, 22px serif.
+From `body_text` (wiki). 180 words, 22px serif.
 
 **Right column, backstory:**
-From `backstory`. Prefixed with "THE BACKSTORY:" label.
+The "THE BACKSTORY:" label introduces the deeper portion of `body_text` (wiki).
 
 **Right column, QR:**
 QR encodes `{qr_base_url}/concurrent-3280`. Caption from the fixed string: "Scan for the full story: the engineers, the architecture, the lab photos, and what came next."
@@ -456,10 +300,10 @@ Full card as described above. No animated elements. Static display.
 **Loading (first fetch in progress):**
 Same warm off-white canvas. Title bar placeholder (InfoAge blue, full width). Content areas show subtle shimmer placeholder blocks (CSS animation, same colors — no spinners, which look out of place on a museum sign). Text: none. Duration: typically under 2 seconds on LAN.
 
-**Last-known-good (Directus unreachable, cache available):**
-Card renders from local cache exactly as if live. A small status bar at the very bottom of the closer strip (below the closer text, 12px, white/40% opacity): "Content from [date/time]. Reconnecting..." This is subtle enough not to distract visitors but visible to a curator doing a walkthrough.
+**Last-known-good (kiosk serving its cache during a server/LAN outage):**
+Card renders from the kiosk's Service-Worker cache exactly as if live. A small status bar at the very bottom of the closer strip (below the closer text, 12px, white/40% opacity): "Content from [date/time]. Reconnecting..." This is subtle enough not to distract visitors but visible to a curator doing a walkthrough.
 
-**Error (Directus unreachable, no cache):**
+**Error (no content in the read-cache for this exhibit/room):**
 ```
 ┌─────────────────────────────────────────────┐
 │  [Title bar — InfoAge blue — empty title]   │
@@ -478,8 +322,8 @@ Card renders from local cache exactly as if live. A small status bar at the very
 ```
 Font size: 32px. Text centered vertically. Background: dark navy (prevents a blinding white screen if a projector is involved). No spinner — the retry message is sufficient.
 
-**Unpublished/unassigned:**
-If a display has no assignment, or the assigned asset is in Draft status: same error-state layout, message: "No exhibit assigned to this display." This informs the curator and does not show any content.
+**Unassigned:**
+If a display has no assignment, or the assigned exhibit isn't in the read-cache yet: same error-state layout, message: "No exhibit assigned to this display." This informs the curator and does not show any content.
 
 ---
 
@@ -487,7 +331,7 @@ If a display has no assignment, or the assigned asset is in Draft status: same e
 
 ### 5.1 Purpose and Context
 
-A passive screen in the exhibit room plays **self-hosted video** full-screen, looped, muted by default, via an HTML5 `<video>` element. It runs on a `passive` device with `default_form = video`. The source is the Asset's self-hosted `video` media item (served from the local mirror); if a room is assigned instead of a single asset, it cycles across all published assets' self-hosted videos in order. **No YouTube/Vimeo iframe runs on a kiosk** (2026-06-01 policy — public-kiosk escape risk); `youtube_url` drives only the phone/QR deep-content page. Browser-level nav lockdown: issue #37.
+A passive screen in the exhibit room plays **self-hosted video** full-screen, looped, muted by default, via an HTML5 `<video>` element. It runs on a `passive` device with `default_form = video`. The source is the exhibit's ExhibitOS-owned `video_url` (served from the local media store); if a room is assigned instead of a single exhibit, it cycles across the room's exhibits' videos in `sort_order`. **No YouTube/Vimeo iframe runs on a kiosk** (2026-06-01 policy — public-kiosk escape risk); YouTube drives only the phone/QR deep-content page. Browser-level nav lockdown: issue #37.
 
 ### 5.2 Layout: Attract / Idle State
 
@@ -499,7 +343,7 @@ When a display first loads, before the video begins, or when cycling between vid
 │                                                           │
 │   [Museum logo or room name — centered, white text]       │
 │                                                           │
-│   [Exhibit title, if single-asset assignment]             │
+│   [Exhibit title, if single-exhibit assignment]           │
 │   60px white, light weight, centered                      │
 │                                                           │
 │   "Video loading..."  — 28px, white/60%                   │
@@ -523,15 +367,15 @@ A semi-transparent dark strip (48px tall, rgba(0,0,0,0.55)) at the bottom of the
 This strip is subtle enough that visitors focused on the video will not find it distracting, but a curator doing a walkthrough can confirm which exhibit is playing.
 
 **Captions:**
-Since kiosk video is self-hosted HTML5 `<video>`, captions come from an optional sidecar WebVTT `<track>` file attached to the asset (or are burned into the video at production time). There is no reliance on a video platform's native caption UI. If no caption track is provided, the video plays without captions.
+Since kiosk video is self-hosted HTML5 `<video>`, captions come from an optional sidecar WebVTT `<track>` file accompanying the exhibit's video (or are burned into the video at production time). There is no reliance on a video platform's native caption UI. If no caption track is provided, the video plays without captions.
 
 ### 5.4 Looping Behavior
 
-Single-asset assignment: the video replays immediately on end. No pause, no interstitial.
+Single-exhibit assignment: the video replays immediately on end. No pause, no interstitial.
 
-Room assignment (multiple assets with videos): each asset's video plays once, then advances to the next asset in the room's published-asset list (sorted by `sort_order` or alphabetically if no sort is defined). After the last asset's video, it cycles back to the first. A 2-second black interstitial between items prevents a jarring cut.
+Room assignment (multiple exhibits with videos): each exhibit's video plays once, then advances to the next exhibit in the room's list (in `sort_order`). After the last exhibit's video, it cycles back to the first. A 2-second black interstitial between items prevents a jarring cut.
 
-If an asset has no `youtube_url` and no video media items, it is skipped in the room playlist (not an error; just skipped).
+If an exhibit has no `video_url`, it is skipped in the room playlist (not an error; just skipped).
 
 ### 5.5 States
 
@@ -548,7 +392,7 @@ Room name and display name below, 20px white/50%.
 "Contact the curator to assign a video exhibit."
 ```
 
-**Directus unreachable, cache available:** The video URL from cache plays normally. Cache-miss for the URL itself: show the no-content state.
+**Kiosk serving cache during a server/LAN outage:** the cached self-hosted video plays normally. Cache-miss for the video itself: show the no-content state.
 
 **Operating hours (screen off):** The Pi agent or Fully Kiosk schedule powers the physical display off. When the display comes back on, the video resumes from the beginning.
 
@@ -560,7 +404,7 @@ Room name and display name below, 20px white/50%.
 
 The interactive form renders only on devices with `device_class = touchscreen`. If a passive device is assigned the interactive form, the renderer checks the device class at load time and falls back to the device's `default_form` (card or video), displaying a brief warning in the closer strip: "Interactive form requires a touchscreen display. Showing card instead."
 
-The Directus assignment UI should warn (not block) when an author assigns the interactive form to a passive device: "This display is set to Passive. The interactive form requires a touchscreen device. The card will be shown instead."
+The dashboard assignment UI should warn (not block) when a curator assigns the interactive form to a passive device: "This display is set to Passive. The interactive form requires a touchscreen device. The card will be shown instead."
 
 ### 6.2 Touch Target Standards
 
@@ -635,7 +479,7 @@ The overview is a vertically scrollable view of the exhibit's content. Touch-scr
 │ ACTION BUTTONS (3 large buttons, horizontal row, 96px tall each) │
 │                                                                  │
 │  [Gallery  →]    [Meet the Inventor →]   [Related Exhibit →]     │
-│  (if media[])    (if people[])           (if related_assets[])   │
+│  (if gallery)    (if `people`)           (if `related_exhibits`) │
 │                                                                  │
 │  (Buttons appear only if the corresponding content exists)       │
 ├──────────────────────────────────────────────────────────────────┤
@@ -669,7 +513,7 @@ A full-screen horizontally swipeable gallery.
 
 Swipe left/right to advance photos. Left/right arrow buttons (80x80px, semi-transparent dark circles) are always visible for visitors who do not know to swipe. Dot pagination indicator (one dot per photo) is centered below the photo and above the caption.
 
-The hero image is not repeated in the gallery — it has its own slot at the top of the Level 1 overview. The gallery shows only `asset.media[]` items.
+The hero image is not repeated in the gallery — it has its own slot at the top of the Level 1 overview. The gallery shows only the exhibit's additional gallery images.
 
 ### 6.7 Person Bio (Level 2b)
 
@@ -687,7 +531,7 @@ The hero image is not repeated in the gallery — it has its own slot at the top
 └──────────────────────────────────────────────────────────────┘
 ```
 
-If multiple people are linked to the asset, Level 1's "Meet the Inventor" button opens a list view first (each person shown as a 96px-tall row with thumbnail, name, and role). Tapping a person opens Level 2b for that person. The back button returns to the list, not all the way to Level 1. This is a 3-level hierarchy for multi-person exhibits; depth resets on idle.
+If the exhibit names multiple people, Level 1's "Meet the Inventor" button opens a list view first (each person shown as a 96px-tall row with name and role). Tapping a person opens Level 2b for that person. The back button returns to the list, not all the way to Level 1. This is a 3-level hierarchy for multi-person exhibits; depth resets on idle.
 
 ### 6.8 Related Exhibit (Level 2c)
 
@@ -720,7 +564,7 @@ Tapping "Explore this exhibit" navigates to Level 1 of the related exhibit. The 
 
 **Gallery loading (image load):** Image area shows a shimmer placeholder; caption area is blank until the image loads.
 
-**No content (asset unpublished or no assignment):**
+**No content (exhibit not ingested or no assignment):**
 Same error state as the card: "No exhibit assigned to this display" on dark navy background.
 
 **Device class mismatch (passive device assigned interactive):**
@@ -730,7 +574,7 @@ Card or video renders as fallback. A 4-second toast at the bottom: "Interactive 
 
 ## 7. Central Dashboard
 
-The ExhibitOS dashboard is a separate React application (building on AdminApp.tsx, AdminLayout.tsx). It handles display-assignment and fleet control. Authors access it after publishing content in Directus.
+The ExhibitOS dashboard is a separate React application (building on AdminApp.tsx, AdminLayout.tsx). It handles Re-ingest, display assets, display-assignment, and fleet control. Curators use it after authoring content in the docent wiki.
 
 ### 7.1 Dashboard Navigation
 
@@ -742,7 +586,7 @@ The dashboard has five top-level navigation items in the left sidebar:
 │  ─────────────  │
 │  Overview       │
 │  Rooms          │
-│  Assets         │
+│  Exhibits       │
 │  Fleet          │
 │  Settings       │
 └─────────────────┘
@@ -763,25 +607,25 @@ The dashboard home. A quick-glance status surface.
 │                                                                │
 │  SYSTEM STATUS                                                 │
 │  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐         │
-│  │  Directus    │  │  4 Displays  │  │  2 Displays  │         │
-│  │  Connected   │  │  Online      │  │  Offline     │         │
+│  │  Content     │  │  4 Displays  │  │  2 Displays  │         │
+│  │  Ingested 2m │  │  Online      │  │  Offline     │         │
 │  │  ● green     │  │  ● green     │  │  ● red       │         │
 │  └──────────────┘  └──────────────┘  └──────────────┘         │
 │                                                                │
 │  QUICK ACTIONS                                                 │
-│  [Assign Exhibit]  [Export Print Card]  [Fleet Broadcast]      │
+│  [Re-ingest]  [Assign Exhibit]  [Export Print Card]  [Fleet…]  │
 │                                                                │
 │  RECENT ACTIVITY (last 5 events)                               │
 │  ┌──────────────────────────────────────────────────────────┐  │
+│  │  Ingest — created 1, updated 3, unchanged 104 · 2m ago   │  │
 │  │  VCF Main Gallery · left wall — Content updated 2m ago   │  │
 │  │  Fleet · pi-gallery-01 — Came online 14m ago             │  │
-│  │  Asset · Concurrent 3280 — Published by Doug 1h ago      │  │
 │  │  ...                                                     │  │
 │  └──────────────────────────────────────────────────────────┘  │
 └────────────────────────────────────────────────────────────────┘
 ```
 
-Directus status is a live ping from the ExhibitOS server to Directus's `/server/health` endpoint. The count tiles link to the Fleet tab filtered to online/offline.
+The "Content" tile shows the last successful ingest time (`ingested_at`) and the counts the Re-ingest returned. The count tiles link to the Fleet tab filtered to online/offline.
 
 ### 7.3 Rooms Screen
 
@@ -796,14 +640,14 @@ The room tree is the assignment surface. Authors think in rooms, not device host
 │     ┌────────────────────────────────────────────────────────┐ │
 │     │  Display: Main Gallery — left wall                     │ │
 │     │  Class: Passive · Platform: Pi · Form: Card            │ │
-│     │  Content: The Concurrent 3280  (Published)             │ │
+│     │  Content: The Concurrent 3280  (Ingested)              │ │
 │     │  Status: ● Online · 2m ago                             │ │
 │     │                                          [Manage →]    │ │
 │     └────────────────────────────────────────────────────────┘ │
 │     ┌────────────────────────────────────────────────────────┐ │
 │     │  Display: Main Gallery — touchscreen kiosk             │ │
 │     │  Class: Touchscreen · Platform: Pi · Form: Interactive │ │
-│     │  Content: The Concurrent 3280  (Published)             │ │
+│     │  Content: The Concurrent 3280  (Ingested)              │ │
 │     │  Status: ● Online · 1m ago                             │ │
 │     │                                          [Manage →]    │ │
 │     └────────────────────────────────────────────────────────┘ │
@@ -828,13 +672,13 @@ Clicking "Manage" on a display opens a side panel (480px wide, slides in from ri
 │  CURRENT CONTENT                                             │
 │  ┌────────────────────────────────────────────────────────┐  │
 │  │  The Concurrent 3280                                   │  │
-│  │  Form: Card  ·  Published                              │  │
+│  │  Form: Card  ·  Ingested                               │  │
 │  │  [Change Exhibit]  [Change Form]  [Remove Assignment]  │  │
 │  └────────────────────────────────────────────────────────┘  │
 ├──────────────────────────────────────────────────────────────┤
 │  ASSIGN NEW CONTENT                                          │
 │                                                              │
-│  Select exhibit:  [Search / dropdown — published only]       │
+│  Select exhibit:  [Search / dropdown — ingested exhibits]    │
 │  Form:            [Card ▼]  (Card / Video / Interactive*)    │
 │                   * Interactive disabled if class = Passive  │
 │                   with tooltip: "Requires touchscreen device"│
@@ -908,35 +752,35 @@ The Display detail panel gains a **Display Profile** section, between Fleet Cont
 
 This is an **admin/provisioning** step (Persona C, set once), not a routine curator task — it lives in the same panel but visually below the day-to-day content/print/fleet controls.
 
-### 7.5 Assets Screen
+### 7.5 Exhibits Screen
 
-A read-only list of published Directus assets, pulling from the ExhibitOS Directus sync cache. This screen exists so a curator can find and export a card without knowing which display it is assigned to.
+A **read-only** list of the ingested exhibits, pulling from the `Exhibit` read-cache (sorted by `sort_order`), with a **Re-ingest** action at the top. This screen exists so a curator can confirm what ingested, set display assets, and export a card without knowing which display it is assigned to. Narrative fields are not editable here — they're edited in the wiki.
 
 ```
 ┌────────────────────────────────────────────────────────────────┐
-│  Assets                         [Search]        [Filter ▼]    │
+│  Exhibits          [Re-ingest]   [Search]        [Filter ▼]    │
 ├────────────────────────────────────────────────────────────────┤
-│  Showing 3 assets  ·  3 published                              │
+│  Showing 108 exhibits  ·  last ingest: 2m ago (created 1, …)   │
 │                                                                │
 │  ┌────────────────────────────────────────────────────────┐    │
 │  │ [Hero thumb 80x80]  The Concurrent 3280                │    │
-│  │                     Published  ·  VCF Main Gallery     │    │
-│  │                     [Export Card PDF]   [View in Directus →]│
+│  │                     concurrent-3280  ·  VCF Main Gallery│    │
+│  │                     [Export Card PDF]   [View in wiki →]│    │
 │  └────────────────────────────────────────────────────────┘    │
 │  ┌────────────────────────────────────────────────────────┐    │
 │  │ [Hero thumb 80x80]  SGI Onyx 10000                     │    │
-│  │                     Published  ·  VCF Main Gallery     │    │
-│  │                     [Export Card PDF]   [View in Directus →]│
+│  │                     sgi-onyx-10000  ·  VCF Main Gallery │    │
+│  │                     [Export Card PDF]   [View in wiki →]│    │
 │  └────────────────────────────────────────────────────────┘    │
 │  ┌────────────────────────────────────────────────────────┐    │
-│  │ [placeholder]       Wang VS 100         (Draft)        │    │
-│  │                     Draft  ·  No room assigned         │    │
-│  │                     (card export disabled for drafts)  │    │
+│  │ [no hero set]       Wang VS 100                        │    │
+│  │                     wang-vs-100  ·  no hero/video yet   │    │
+│  │                     [Set display assets]               │    │
 │  └────────────────────────────────────────────────────────┘    │
 └────────────────────────────────────────────────────────────────┘
 ```
 
-"View in Directus" opens Directus admin in a new tab, deep-linked to that asset record. This is the bridge that reminds curators where content editing happens. The dashboard does not replicate the asset edit form.
+"View in wiki" opens the exhibit's source page in the docent wiki in a new tab — the reminder that narrative editing happens in the wiki. The dashboard does not replicate the narrative editor; it only edits the ExhibitOS-owned display fields (hero/video/deep-link/location).
 
 ### 7.6 Fleet Screen
 
@@ -987,11 +831,11 @@ If a Pi device's kiosk is displaying a URL other than its expected `/display/<sl
 
 The settings screen contains the ExhibitOS-level configuration that the System Admin sets once and the curator rarely needs to touch.
 
-- Directus connection (URL, API token, sync interval)
+- Wiki-ingest source (the export file path; later the DokuWiki API URL + read-only token)
 - `qr_base_url` — the global base for all QR codes
-- Dashboard admin password change (for v1 separate-auth model)
+- Dashboard admin password change
 - Card export settings (paper size, DPI — for Playwright)
-- A "Test Directus connection" button that pings Directus and shows the response
+- A "Re-ingest now" button that runs the ingest and reports the created/updated/unchanged counts
 
 ---
 
@@ -1023,7 +867,7 @@ The primary accessibility consideration for kiosk displays is legibility at 1.0�
 **Touch target sizes:** Covered in §6.2. Restated: minimum 64px, preferred 88px for primary actions.
 
 **Screen reader / ARIA:**
-The kiosk displays are not operated via screen reader in typical museum use; however, the dashboard is. All dashboard form fields have labels. Status colors have text labels. Error messages are announced (ARIA live regions on the fleet status and error toast components). Image alt text flows from `media_item.alt_text` into the card renderer's `<img alt>` attribute.
+The kiosk displays are not operated via screen reader in typical museum use; however, the dashboard is. All dashboard form fields have labels. Status colors have text labels. Error messages are announced (ARIA live regions on the fleet status and error toast components). Image alt text flows from the exhibit's image metadata into the card renderer's `<img alt>` attribute.
 
 **No motion requirement:** No animations on the passive card renderer. Animations on the touchscreen interactive (gallery swipe, fade transitions) must respect `prefers-reduced-motion`. If set, use instant cuts instead of fades/slides.
 
@@ -1042,7 +886,7 @@ Behavior is driven by the **Display Profile** (ARCHITECTURE §6a): card = fixed 
 | Dashboard | Museum workstation (desktop) | Standard responsive layout, ≥1024px |
 | Dashboard | Museum tablet (iPad/Android) | Sidebar collapses to icon-only at <1024px |
 | Dashboard | Phone | Not a target; not optimized |
-| Directus authoring | Any browser | Directus's own responsive layout; no customization needed |
+| Wiki authoring | Any browser | The docent wiki's own responsive layout; outside ExhibitOS |
 
 **Portrait screens (v1, not Phase 2).** Portrait is **fully supported in v1**. `DisplayCanvas` accepts a design size (landscape `1920×1080` or portrait `1080×1920`); `RoomDisplay` picks it from `profile.orientation`. The portrait card is a distinct composition (§4.2a), not a CSS-rotated landscape. (This supersedes the earlier "Phase 2 portrait prop" note.)
 
@@ -1055,14 +899,14 @@ The PRD §8 and §9a hard requirement: no demo data, no placeholder content on a
 | State | What shows |
 |---|---|
 | Display not assigned | "No exhibit assigned to this display." + room name |
-| Asset is Draft (not Published) | "No exhibit assigned." (same message; do not expose draft status to a museum visitor) |
-| Directus unreachable, cache fresh | Last-known-good content + subtle cache-date indicator in the closer strip |
-| Directus unreachable, no cache | Error screen with reconnect message. Dark navy, no content |
-| Self-hosted video missing/404 in mirror | No-content state for video display. Do not autoplay an error page |
-| Related exhibit deleted | Related exhibit button does not render. No broken link |
+| Assigned exhibit not yet ingested | "No exhibit assigned." (same message; don't expose internal state to a visitor) |
+| Kiosk serving its cache during a server/LAN outage | Last-known-good content + subtle cache-date indicator in the closer strip |
+| Read-cache empty for this room | Error screen with reconnect message. Dark navy, no content |
+| Self-hosted video missing/404 in the media store | No-content state for video display. Do not autoplay an error page |
+| Related exhibit removed | Related exhibit button does not render. No broken link |
 | Gallery image fails to load | Image area shows museum's fallback image (a simple camera icon on off-white). Caption and credit still render |
 | Playwright PDF export fails | Dashboard shows error toast; PDF download does not initiate; curator prompted to retry |
-| Directus sync stale (>N minutes without a successful poll) | Dashboard shows a warning banner: "Content sync last succeeded [time]. Directus may be unreachable. Displays are showing cached content." |
+| Wiki unreachable at ingest time | Dashboard shows a warning banner: "Last successful ingest [time]. The wiki may be unreachable. Displays are showing the last ingested content." |
 
 ---
 
@@ -1111,15 +955,15 @@ These are UX-layer items that need a decision or verification before implementat
 
 2. **InfoAge house blue exact value.** The spec uses `#1A3A6B` as a working approximation. Nick or the dev team should match the hex against a physical InfoAge sign or their existing design files before the first print proof.
 
-3. **Directus notification setup for the review workflow.** The authoring flow in §3.6 step 4 assumes Directus's notification system is configured to alert the Reviewer role when an asset moves to "In Review." Directus supports this natively via flows (its automation engine), but it requires setup. Confirm this is in scope for the v1 operational handoff, or simplify the workflow to email the reviewer manually.
+3. **Re-ingest cadence.** v1 re-ingest is on-demand (dashboard button / CLI). Confirm that's acceptable for the handoff, or whether the file-ingest phase should also poll the export on a timer before the live-API phase lands. Review of edits is handled by the wiki's own revision history — ExhibitOS adds no approval step.
 
-4. **Related exhibit back-navigation cap.** The spec caps cross-exhibit traversal at 2 hops (§6.8). If the 3280 and Onyx 10000 both link to each other (bidirectional M2M relation), the visitor could loop. The 2-hop cap prevents an infinite traversal loop. Confirm this feels right from a curatorial standpoint — alternatively, the dashboard could flag bidirectional related-asset pairs and suggest adding directionality.
+4. **Related exhibit back-navigation cap.** The spec caps cross-exhibit traversal at 2 hops (§6.8). If the 3280 and Onyx 10000 both link to each other, the visitor could loop. The 2-hop cap prevents an infinite traversal loop. Confirm this feels right from a curatorial standpoint — alternatively, the dashboard could flag reciprocal related-exhibit pairs.
 
-5. **Dashboard auth unification.** PRD §9b left this open. For v1, the spec assumes two separate logins (Directus and ExhibitOS dashboard). The "View in Directus" button in the Assets screen (§7.5) is the handoff link between the two. If a future unified SSO is implemented, the "View in Directus" deep link still works; only the login step changes.
+5. **"View in wiki" deep link.** The Exhibits screen (§7.5) links each exhibit to its source page in the docent wiki. Confirm the wiki page URL is derivable from the exhibit's `source_ref`/slug (it should be), so the deep link resolves directly to the right page.
 
 6. **Portrait-orientation card — RESOLVED (2026-06-01): in v1.** Portrait is fully supported in v1 via a distinct designed portrait canvas (§4.2a, ARCHITECTURE §6a), not a flex-direction toggle on the landscape layout. Open verification: confirm the portrait composition reads as InfoAge house style on a real portrait sign at the first print proof (folded into the print-proof issue). The portrait canvas dimensions (`1080×1920` on-screen; print canvas TBD with InfoAge per Q1) should be confirmed against any physical portrait sign InfoAge already has.
 
-7. **Volunteer runbook scope.** The spec describes the authoring UX. The runbook (a separate deliverable per PRD §8.2) should incorporate the exact step-by-step flows from §3.6 of this spec, formatted as a printable document. Confirm whether the runbook is within this UX spec's scope or is authored separately.
+7. **Volunteer runbook scope.** The spec describes the ExhibitOS-side authoring touchpoints. The runbook (a separate deliverable per PRD §8.2) should incorporate the exact step-by-step flow from §3.4 of this spec (author in the wiki → Re-ingest → set assets → assign → print), formatted as a printable document. Confirm whether the runbook is within this UX spec's scope or is authored separately.
 
 ---
 
@@ -1127,5 +971,6 @@ These are UX-layer items that need a decision or verification before implementat
 
 | Version | Date | Author | Changes |
 |---|---|---|---|
-| 0.1 | 2026-05-31 | Nick DeMarco (AI-assisted) | Initial draft. Covers Directus authoring UX, all three render targets, dashboard wireframes, accessibility, design language. |
-| 0.2 | 2026-06-01 | Nick DeMarco (AI-assisted) | **Display Profile.** Added portrait card wireframe (§4.2a, 1080×1920 distinct composition); portrait now v1, not Phase 2 (resolved §10 Q6). Rewrote responsive matrix (§8.2) for portrait + odd aspect + 4K. Added Display Profile setup flow to the Display detail panel (§7.4a — auto-detected read-only fields + manual physical size/distance + live text-scale preview + orientation override). Tied §8.1 ADA minimums to the profile text-scale. Updated key-decisions table and authoring happy path. Aligns with ARCHITECTURE §6a (2026-06-01). |
+| 0.1 | 2026-05-31 | Nick DeMarco (AI-assisted) | Initial draft. Covered a CMS-based authoring UX, all three render targets, dashboard wireframes, accessibility, design language. (Authoring approach reversed in 0.3 — see ADR-0001.) |
+| 0.2 | 2026-06-01 | Nick DeMarco (AI-assisted) | **Display Profile.** Added portrait card wireframe (§4.2a, 1080×1920 distinct composition); portrait now v1, not Phase 2 (resolved §10 Q6). Rewrote responsive matrix (§8.2) for portrait + odd aspect + 4K. Added Display Profile setup flow to the Display detail panel (§7.4a). Tied §8.1 ADA minimums to the profile text-scale. Aligns with ARCHITECTURE §6a (2026-06-01). |
+| 0.3 | 2026-06-05 | Nick DeMarco (AI-assisted) | **Content architecture refactor (ADR-0001).** Authoring moves to the docent wiki: replaced the CMS authoring-UX section (§3) with the wiki-authoring content path (author in wiki → Re-ingest → set ExhibitOS-owned display assets → assign), renamed the Assets screen to **Exhibits** with a Re-ingest action and "View in wiki" (§7.5), updated the Overview tile, Settings, error-state policy (§4.5/§5.5/§8.3), responsive matrix (§8.2), key-decisions table, personas, and open questions (§10). Render targets, dashboard layout, and the Display Profile are unchanged. |

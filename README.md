@@ -56,9 +56,9 @@ video). The whole stack runs in **Docker on a single mini PC**; the screens them
 ~$20 streaming sticks, Raspberry Pis, or repurposed legacy PCs. Software cost is effectively zero;
 it's MIT-licensed end to end.
 
-> **Content architecture:** we evaluated a self-hosted CMS (Directus) and chose instead to use the
-> museum's existing wiki as the source of truth — simpler, less to run, and it reuses the docents'
-> tools and revision control. See [decisions/0001-content-source.md](docs/decisions/0001-content-source.md).
+> **Content architecture:** the docent wiki is the source of truth — see
+> [decisions/0001-content-source.md](docs/decisions/0001-content-source.md). (A self-hosted CMS was
+> explored and passed on: simpler to use the museum's existing wiki and its revision control.)
 
 ## Run it locally
 
@@ -97,12 +97,12 @@ Start with the [docs index](docs/README.md), or jump straight in:
 |-----|----------------|
 | [docs/README.md](docs/README.md) | Documentation index / where to start |
 | [docs/VCF-PROPOSAL.md](docs/VCF-PROPOSAL.md) | **The pitch** — why ExhibitOS for the VCF Museum, and the proposed pilot |
-| [docs/DIRECTUS.md](docs/DIRECTUS.md) | **What Directus is** — plain-language primer on the free, self-hosted content tool ExhibitOS is built on |
 | [docs/PRD.md](docs/PRD.md) | Product requirements — vision, the four forms, personas, scope |
-| [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | Technical architecture — Directus as content SoR, renderers + fleet, Display Profile, caching |
+| [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | Technical architecture — wiki-as-source ingest, renderers + fleet, Display Profile, caching |
 | [docs/UX-SPEC.md](docs/UX-SPEC.md) | UX specification — layouts, the InfoAge house card style, legibility |
 | [docs/DEV-PLAN.md](docs/DEV-PLAN.md) | Development plan — epics, stories, and the v1 milestone |
 | [docs/OPEN-QUESTIONS.md](docs/OPEN-QUESTIONS.md) | Decisions still to be made (and what we'd like museum input on) |
+| [docs/decisions/0001-content-source.md](docs/decisions/0001-content-source.md) | **Why the docent wiki is the source of truth** — the content-source decision record (links to the CMS option we explored and passed on) |
 | [CONTRIBUTING.md](CONTRIBUTING.md) | How to get involved and contribute |
 
 ## Get involved
@@ -126,7 +126,7 @@ and ~$20 streaming sticks (FastAPI + React + SQLite + WebSocket). SignBoard is g
 thing — device-agnostic kiosk rendering and fleet control — and that is exactly the part
 ExhibitOS keeps. Everything community-specific (tide, surf, and weather boards, marina
 notices) is stripped out and replaced with the museum domain — exhibits, rooms, artifacts,
-people, and interpretive cards — paired with Directus for content.
+people, and interpretive cards — with content ingested from the museum's existing docent wiki.
 
 ## License
 

@@ -14,7 +14,7 @@ decided** and **what's still open** — especially the things we need **VCF / mu
 
 These are settled (see [`PRD.md`](PRD.md) §9 and [`ARCHITECTURE.md`](ARCHITECTURE.md) for rationale):
 
-- **Content lives in the museum's docent wiki** (where docents already author, with built-in revision control); ExhibitOS **ingests** and renders it. A self-hosted CMS (Directus) was evaluated and deferred — see [`decisions/0001-content-source.md`](decisions/0001-content-source.md).
+- **Content lives in the museum's docent wiki** (where docents already author, with built-in revision control); ExhibitOS **ingests** and renders it. A self-hosted CMS was explored and passed on — see [`decisions/0001-content-source.md`](decisions/0001-content-source.md).
 - **One deployment per museum** — fully isolated; "generic platform" means anyone can deploy the same code.
 - **Kiosk video is self-hosted HTML5** (no YouTube embedded on a public kiosk — escape risk); YouTube is for the phone/QR deep-dive only. Kiosk browsers are locked to the ExhibitOS origin.
 - **Interpretive cards render on-screen and export to print** (Playwright), matching InfoAge's existing sign style — in **both landscape and portrait**.
@@ -44,7 +44,7 @@ These shape the build and are the best places to collaborate.
   faithful print proof.
 
 ### 4. Content & curation
-- Who authors exhibit content (which volunteers/docents)? Who reviews/approves before it goes live?
+- Docents already author placard text in the wiki. Which pages/namespace should ExhibitOS ingest, and who curates that set?
 - Which exhibits are highest priority for the new space?
 
 ### 5. Operations & sustainability ("we build, we don't run")
@@ -53,10 +53,10 @@ These shape the build and are the best places to collaborate.
   how much we automate and what the runbook must cover.
 
 ### 6. Wiki access for ingest
-- ExhibitOS needs a read path into the docent wiki (DokuWiki) to ingest exhibit content — the wiki's
-  API with a read-only docent account, or a scheduled export. Need to confirm the wiki's API is
-  enabled and agree on an access method. *(Directus licensing is no longer a question — Directus was
-  deferred; see [`decisions/0001-content-source.md`](decisions/0001-content-source.md).)*
+- ExhibitOS needs a read path into the docent wiki (DokuWiki) to ingest exhibit content. v1 ingests a
+  DokuWiki **export file**; the next step is the **live DokuWiki API** (XML-RPC/REST) with a read-only
+  docent account, or a scheduled export. Need to confirm the wiki's API is enabled and agree on an
+  access method.
 
 ---
 
@@ -65,7 +65,7 @@ These shape the build and are the best places to collaborate.
 Lower-stakes, resolved during build:
 
 - **Print canvas dimensions per orientation** — set once the physical sign sizes (Q3) are known.
-- **Reviewer notifications** — manual "email the reviewer" step for v1; automated Directus Flow later.
+- **Content review** — handled by the docent wiki's own revision history/diffs/attribution; ExhibitOS does not implement its own review step.
 - **Text-scale defaults** — baseline 24″ @ 5 ft; per-display physical size/distance entered by an admin once.
 - **Device attribution** — each kiosk URL carries a `?device_id=` so a screen can report its profile.
 

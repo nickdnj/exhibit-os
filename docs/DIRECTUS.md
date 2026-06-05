@@ -1,14 +1,17 @@
-# Understanding Directus — the content backbone
+# Understanding Directus — a design option we explored and passed on
 
-> 🔖 **Status (2026-06-02): evaluated and DEFERRED — not currently used.** We compared a self-hosted
-> CMS (Directus) against using the museum's existing docent wiki, and chose the wiki as the content
-> source of truth (simpler, less to run, reuses the docents' tools and revision control). See
-> [`decisions/0001-content-source.md`](decisions/0001-content-source.md). This page is retained as
-> background and as a documented future option if the museum later needs richer media management or
-> many concurrent authors with formal roles.
+> 🔖 **Status: explored and NOT used.** Early in the design we considered standing up a self-hosted
+> CMS (Directus) as ExhibitOS's content backbone. We compared it against using the museum's existing
+> **docent wiki** as the content source of truth — and chose the wiki (simpler, less to run, and it
+> reuses the docents' existing authoring tool and its built-in revision control). **Directus is not
+> part of the ExhibitOS architecture.** For the reasoning behind the decision, see
+> [`decisions/0001-content-source.md`](decisions/0001-content-source.md). This page is kept as the
+> record of what was considered — and as a documented fallback if the museum ever outgrows the wiki
+> (e.g. it needs richer media management or many concurrent authors with formal roles).
 
-> **Who this is for:** anyone (museum staff included) who wants to understand *what Directus is* — no
-> technical background assumed.
+> **Who this is for:** anyone (museum staff included) curious about *what Directus is* and *why we
+> looked at it* — no technical background assumed. Nothing here describes how ExhibitOS works today;
+> for that, read [`ARCHITECTURE.md`](ARCHITECTURE.md).
 
 ## The one-sentence version
 
@@ -16,20 +19,26 @@
 where non-technical people fill in forms to manage content** — and it automatically hands that
 content to other apps (like ExhibitOS) through a clean data feed.
 
-## What problem it solves for us
+## The problem we were trying to solve
 
 A museum's exhibit information — titles, photos, the story, credits, who designed it, what it
-relates to — has to *live somewhere* and be *editable by volunteers*. We had two choices:
+relates to — has to *live somewhere* and be *editable by volunteers*. When we started, that looked
+like a choice between three options:
 
 1. **Build our own content editor** (forms, logins, photo uploads, drafts, an approval step,
    edit history…). That's months of work and a maintenance burden forever.
-2. **Use a proven tool that already does all of that.** That's Directus.
+2. **Use a proven CMS that already does all of that** — which is what Directus is.
+3. **Reuse the authoring tool the docents already use** — the museum's existing DokuWiki, which
+   already has revision history, diffs, and attribution.
 
-We chose #2. ExhibitOS doesn't reinvent the content editor — it lets Directus be the editor and
-focuses on the part that's actually unique to us: **putting that content onto signs, screens, and
-phones, and controlling the displays.**
+Directus (option 2) was a strong candidate, and this page explains why. But as we learned more about
+the actual collection (a flat ~hundreds-item set the docents *already* maintain in their wiki), we
+chose option 3: the wiki stays the source of truth and ExhibitOS ingests it. That keeps one fewer
+service to run and reuses revision control the museum already has. See
+[`decisions/0001-content-source.md`](decisions/0001-content-source.md) for the full comparison. The
+rest of this page describes Directus as we evaluated it.
 
-## The two things Directus gives you
+## The two things Directus would have given us
 
 1. **The Data Studio** — a polished web app (you log in with a browser) where a volunteer creates
    and edits content by filling in forms. You define "collections" once — think of them as
@@ -40,21 +49,26 @@ phones, and controlling the displays.**
    - **Revision history** — see who changed what, and roll back.
    - **A media library** for photos and videos with captions and credits.
 2. **Instant APIs** — the moment you create a collection, Directus automatically publishes a clean
-   data feed of it. ExhibitOS reads that feed to render the signs. (No one at the museum ever has
-   to think about this part — it's how the two programs talk.)
+   data feed of it, which a renderer like ExhibitOS could read.
 
-## What "self-hosted" means (and why it matters)
+> The catch we eventually weighed: the docent wiki **already** provides the accounts, drafts,
+> approval, and revision history in #1 — and the docents already author there. Adding Directus would
+> have meant running a second authoring tool (and its database) to duplicate version control the
+> museum already had. That tipped the decision to wiki-as-source.
 
-"Self-hosted" means **Directus runs on our own computer — the mini PC at the museum — not on
-someone else's paid cloud service.** Practically:
+## What "self-hosted" would have meant
 
-- It runs as a small **Docker** container alongside ExhibitOS. No separate machine needed.
-- **The museum owns its data.** It lives in a database on the mini PC. Nothing is rented, nothing
-  phones home, and no vendor can raise a price or pull the plug.
-- The alternative — a hosted "Directus Cloud" subscription — exists, but **we don't need it.** Same
-  software, we just run it ourselves for free.
+Directus can run two ways: as a paid "Directus Cloud" subscription, or **self-hosted** — on your own
+computer, with no cloud fees. The self-hosted path is the one we evaluated:
 
-## Cost & license — the part to confirm with VCF
+- It would run as a small **Docker** container alongside ExhibitOS. No separate machine needed.
+- **The museum would own its data** — it lives in a database on the mini PC. Nothing rented, nothing
+  phoning home, no vendor able to raise a price or pull the plug.
+
+(Choosing the wiki as the source of truth means none of this is part of the actual deployment — the
+wiki the docents already run is where content lives.)
+
+## Cost & license (as it would have applied)
 
 - **Software cost: $0.** Directus is open-source.
 - **License:** the *Monospace Sustainable Core License (MSCL)*. The key term: **if your
@@ -62,26 +76,26 @@ someone else's paid cloud service.** Practically:
   whichever is largest), **you can self-host Directus for free, in production, with no feature limits
   or paywalls.** Only organizations *over* $5M using it in production need a paid commercial license,
   and nonprofits get discounts even then.
-- **VCF is a 501(c)(3) nonprofit well under that threshold**, so this is almost certainly free with
-  no asterisks — we just want a quick confirmation of the income figure to document it. (Tracked as
-  an open item in [`OPEN-QUESTIONS.md`](OPEN-QUESTIONS.md) §6.)
+- VCF is a 501(c)(3) nonprofit well under that threshold, so cost was never the blocker. The decision
+  came down to **operational simplicity** — one fewer service to run — not licensing.
 
-## What it needs to run
+## What it would have needed to run
 
 - **Docker** on the mini PC (the same way ExhibitOS runs).
-- **A database** for Directus's content — we use **PostgreSQL** (Directus also supports MySQL,
-  SQLite, and others; we picked Postgres because it handles revision history and multiple authors
-  well). ExhibitOS keeps its own small SQLite database separately.
-- **Modest resources** — Directus is lightweight and runs comfortably on the kind of mini PC we're
-  already planning for; it does not need a powerful server.
+- **A database** for Directus's content — typically **PostgreSQL**, which handles revision history
+  and multiple authors well (Directus also supports MySQL, SQLite, and others).
+- **Modest resources** — Directus is lightweight and would have run comfortably on the planned mini
+  PC. Even so, it was a *second* database engine and service to operate; the wiki-ingest design keeps
+  the stack to a single ExhibitOS service plus the wiki the museum already runs.
 
-## Where this is in the ExhibitOS build (honest status)
+## Where this stands in the ExhibitOS build (honest status)
 
-Directus is the **chosen and documented** content backbone, but it is **not yet wired into ExhibitOS
-in the running code.** Today's working demo uses ExhibitOS's own built-in content for signs; the
-Directus integration (authoring exhibits in the Data Studio → ExhibitOS rendering them) is the
-**next major build phase.** This document describes the destination, and the architecture for getting
-there is in [`ARCHITECTURE.md`](ARCHITECTURE.md).
+Directus is **not used by ExhibitOS** and never was wired into the running code. The content path
+that *is* built ingests the docent wiki into a local read-cache and renders it — see
+[`ARCHITECTURE.md`](ARCHITECTURE.md) for how it actually works and
+[`decisions/0001-content-source.md`](decisions/0001-content-source.md) for why we chose the wiki.
+This page exists only as the record of the option we explored and as a fallback to revisit if the
+museum's needs ever outgrow the wiki.
 
 ## Try it yourself (5 minutes, needs Docker)
 

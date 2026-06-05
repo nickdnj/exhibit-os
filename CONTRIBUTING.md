@@ -8,7 +8,8 @@ Collaborators come in two flavors and **both are welcome**:
   write code to shape this. The most valuable contributions right now are answering the
   questions in [`docs/OPEN-QUESTIONS.md`](docs/OPEN-QUESTIONS.md) about how a real museum
   works, what hardware the space will have, and how content should be authored.
-- **Developers / makers** — full-stack web, Raspberry Pi / kiosk tinkerers, Directus folks.
+- **Developers / makers** — full-stack web (FastAPI + React), Raspberry Pi / kiosk tinkerers, and
+  anyone who has wrangled DokuWiki exports or APIs.
 
 ## Where to start
 
